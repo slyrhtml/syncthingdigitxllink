@@ -18,30 +18,31 @@ async function fetchAPI(endpoint) {
 }
 
 function formatBytes(bytes, decimals = 2) {
-    if (!+bytes) return '0 Bytes';
+    if (!+bytes) return '0 B';
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
-}
-
-function formatTime(dateString) {
-    if (!dateString) return 'Never';
-    const date = new Date(dateString);
-    return date.toLocaleString();
 }
 
 async function loadDashboard() {
   const config = await fetchAPI('/system/config');
   const systemStatus = await fetchAPI('/system/status');
+  const connections = await fetchAPI('/system/connections');
   
   if (!config || !systemStatus) return;
 
   // Update Top Metrics
-  document.getElementById('global-state').innerText = 'Online';
-  document.getElementById('total-folders').innerText = config.folders.length;
-  document.getElementById('connected-devices').innerText = config.devices.length;
+  document.getElementById('metric-folders-count').innerText = config.folders.length;
+  document.getElementById('metric-devices-count').innerText = config.devices.length;
+  document.getElementById('metric-global-state').innerHTML = `<span class="unit">Online</span>`;
+  
+  if (connections) {
+      document.getElementById('metric-up-rate').innerText = formatBytes(connections.total.outBytesTotal) + '/s';
+      document.getElementById('metric-down-rate').innerText = formatBytes(connections.total.inBytesTotal) + '/s';
+  }
+  document.getElementById('metric-cpu').innerText = (systemStatus.cpuPercent || 0).toFixed(1) + '%';
 
   // We need to fetch DB status for all folders to get total data
   let totalData = 0;
@@ -56,41 +57,46 @@ async function loadDashboard() {
 
     // Render Folder List Item
     const itemEl = document.createElement('div');
-    itemEl.className = 'list-item';
+    itemEl.className = 'invoice-item';
     
     // Determine status (Idle vs Syncing)
     const isIdle = dbStatus?.state === 'idle';
-    const statusClass = isIdle ? 'idle' : 'syncing';
+    const statusClass = isIdle ? 'viewed' : 'unsent-white'; // mapped to our CSS classes
     const statusText = dbStatus?.state ? dbStatus.state.charAt(0).toUpperCase() + dbStatus.state.slice(1) : 'Unknown';
 
     itemEl.innerHTML = `
-      <div class="item-icon">📁</div>
-      <div class="item-info">
-        <h4>${folder.label || folder.id}</h4>
-        <p>${folder.path}</p>
+      <img src="https://ui-avatars.com/api/?name=${folder.label || folder.id}&background=random" class="item-av">
+      <div class="item-id-date">
+        <span class="id">${folder.label || folder.id}</span>
+        <span class="date" style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${folder.path}</span>
       </div>
-      <div class="item-size">${formatBytes(dbStatus?.globalBytes)}</div>
-      <div class="item-status ${statusClass}">${statusText}</div>
+      <span class="status ${statusClass}">${statusText}</span>
+      <span class="amount">${formatBytes(dbStatus?.globalBytes)}</span>
     `;
 
     // Click handler to load details
     itemEl.addEventListener('click', () => {
       document.getElementById('detail-title').innerText = folder.label || folder.id;
       document.getElementById('detail-status').innerText = statusText;
+      document.getElementById('detail-id').innerText = folder.id;
       document.getElementById('detail-path').innerText = folder.path;
-      document.getElementById('detail-size').innerText = formatBytes(dbStatus?.globalBytes);
-      document.getElementById('detail-scanned').innerText = formatTime(dbStatus?.sequence > 0 ? new Date() : null); // Mocked time for now
-      document.getElementById('detail-local').innerText = formatBytes(dbStatus?.localBytes);
+      document.getElementById('detail-global-size').innerText = formatBytes(dbStatus?.globalBytes);
+      document.getElementById('detail-local-size').innerText = formatBytes(dbStatus?.localBytes);
+      document.getElementById('detail-files').innerText = dbStatus?.globalFiles || 0;
+      document.getElementById('detail-dirs').innerText = dbStatus?.globalDirectories || 0;
       
-      // Remove active state from all items, add to current
-      document.querySelectorAll('.list-item').forEach(el => el.style.borderColor = '#f0f0f0');
-      itemEl.style.borderColor = 'var(--accent-color)';
+      const lastScan = dbStatus?.sequence > 0 ? new Date().toLocaleString() : 'Never';
+      document.getElementById('detail-scanned').innerText = lastScan;
+      
+      // Update active state in UI
+      document.querySelectorAll('.invoice-item').forEach(el => el.classList.remove('active'));
+      itemEl.classList.add('active');
     });
 
     foldersListEl.appendChild(itemEl);
   }
 
-  document.getElementById('total-data').innerText = formatBytes(totalData);
+  document.getElementById('metric-total-data').innerText = formatBytes(totalData);
 }
 
 // Initial load

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Salesforce Invoices</title>
+  <title>Syncthing Desktop</title>
   <link rel="stylesheet" href="index.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,19 +15,19 @@
     <!-- Top Navigation -->
     <header class="top-nav">
       <div class="logo">
-        <svg viewBox="0 0 24 24" fill="white" width="24" height="24"><path d="M12 2L14.4 9.6H22L15.8 14.4L18.2 22L12 17.2L5.8 22L8.2 14.4L2 9.6H9.6L12 2Z"/></svg>
-        <span>salesforce</span>
+        <svg viewBox="0 0 24 24" fill="white" width="24" height="24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+        <span>syncthing</span>
       </div>
       
       <div class="center-nav">
         <div class="grid-icon">80</div>
         <div class="nav-pill-container">
           <button class="nav-icon-btn"><svg viewBox="0 0 24 24" width="16" height="16" fill="white"><rect x="3" y="5" width="18" height="14" rx="2"/></svg></button>
-          <button class="nav-item">Estimates</button>
-          <button class="nav-item active"><span class="dot"></span> Invoices</button>
-          <button class="nav-item">Payments</button>
-          <button class="nav-item">Recurring invoices</button>
-          <button class="nav-item">Checkouts</button>
+          <button class="nav-item">Dashboard</button>
+          <button class="nav-item active"><span class="dot"></span> Folders</button>
+          <button class="nav-item">Devices</button>
+          <button class="nav-item">Settings</button>
+          <button class="nav-item">Advanced</button>
         </div>
       </div>
 
@@ -52,11 +52,11 @@
     <div class="page-header">
       <div class="title-section">
         <button class="back-btn">←</button>
-        <h1>Invoices</h1>
+        <h1>Folders</h1>
       </div>
       <div class="action-section">
         <button class="filter-icon-btn">≢</button>
-        <button class="create-btn">Create an invoice</button>
+        <button class="create-btn">Add new folder</button>
       </div>
     </div>
 
@@ -66,25 +66,25 @@
       <div class="card metrics-wide-card">
         <div class="metrics-row">
           <div class="metric">
-            <span class="label">Overdue</span>
-            <span class="value"><span class="currency">$</span>31,211.00</span>
+            <span class="label">Total Folders</span>
+            <span class="value" id="metric-folders-count">0</span>
           </div>
           <div class="metric">
-            <span class="label">Due within next month</span>
-            <span class="value"><span class="currency">$</span>172,560.00</span>
+            <span class="label">Total Devices</span>
+            <span class="value" id="metric-devices-count">0</span>
           </div>
           <div class="metric">
-            <span class="label">Average time to get paid</span>
-            <span class="value">12 <span class="unit">days</span></span>
+            <span class="label">Global State</span>
+            <span class="value" id="metric-global-state"><span class="unit">Loading</span></span>
           </div>
         </div>
         
         <div class="timeline">
           <div class="timeline-labels">
-            <span>Sep</span>
-            <span>Oct</span>
-            <span>Nov</span>
-            <span>Dec</span>
+            <span>Scan 1</span>
+            <span>Scan 2</span>
+            <span>Scan 3</span>
+            <span>Scan 4</span>
           </div>
           <div class="timeline-bar-bg">
             <div class="timeline-bar green-1" style="width: 15%; left: 0;"></div>
@@ -93,13 +93,7 @@
           </div>
           <div class="timeline-avatars">
             <div class="avatar-group group-1">
-              <img src="https://i.pravatar.cc/100?img=1" class="av"><img src="https://i.pravatar.cc/100?img=2" class="av"><img src="https://i.pravatar.cc/100?img=3" class="av"><img src="https://i.pravatar.cc/100?img=4" class="av"><img src="https://i.pravatar.cc/100?img=5" class="av">
-            </div>
-            <div class="avatar-group group-2" style="margin-left: 100px;">
-              <img src="https://i.pravatar.cc/100?img=6" class="av"><img src="https://i.pravatar.cc/100?img=7" class="av"><img src="https://i.pravatar.cc/100?img=8" class="av">
-            </div>
-            <div class="avatar-group group-3" style="margin-left: 120px;">
-              <img src="https://i.pravatar.cc/100?img=9" class="av"><img src="https://i.pravatar.cc/100?img=10" class="av">
+              <img src="https://i.pravatar.cc/100?img=1" class="av"><img src="https://i.pravatar.cc/100?img=2" class="av"><img src="https://i.pravatar.cc/100?img=3" class="av">
             </div>
           </div>
         </div>
@@ -109,26 +103,26 @@
       <div class="card payout-card">
         <button class="expand-btn">↗</button>
         <div class="payout-header">
-          <span class="label">Available for Instant Payout</span>
+          <span class="label">Total Data Managed</span>
           <div class="payout-value-row">
-            <span class="value"><span class="currency">$</span>214,390.00</span>
-            <span class="badge expects-badge">Expects</span>
+            <span class="value" id="metric-total-data">0 B</span>
+            <span class="badge expects-badge">Synced</span>
           </div>
         </div>
         <div class="payment-methods">
           <div class="method-box dark">
-            <span class="method-num">*4443</span>
-            <span class="method-name">Visa</span>
+            <span class="method-num" id="metric-up-rate">0 B/s</span>
+            <span class="method-name">Upload</span>
           </div>
           <div class="method-box active">
-            <span class="method-num">#177210</span>
-            <span class="method-name">Stripe</span>
+            <span class="method-num" id="metric-down-rate">0 B/s</span>
+            <span class="method-name">Download</span>
           </div>
           <div class="method-box dark">
-            <span class="method-num">#711221</span>
-            <span class="method-name">PayPal</span>
+            <span class="method-num" id="metric-cpu">0%</span>
+            <span class="method-name">CPU</span>
           </div>
-          <button class="pay-out-btn-white">Pay out now</button>
+          <button class="pay-out-btn-white">Pause All</button>
         </div>
       </div>
     </div>
@@ -137,14 +131,12 @@
     <div class="middle-filters">
       <div class="left-filters">
         <span class="filter-label">Active filters <span class="filter-count">2</span></span>
-        <div class="dropdown">All customers ⌄</div>
-        <div class="dropdown">All statuses ⌄</div>
+        <div class="dropdown">All types ⌄</div>
+        <div class="dropdown">All states ⌄</div>
       </div>
       <div class="right-filters">
-        <div class="date-picker">November 2023 📅</div>
-        <div class="date-picker">December 2023 📅</div>
         <div class="search-input">
-          <input type="text" placeholder="Enter invoice #">
+          <input type="text" placeholder="Search folders...">
           <span>🔍</span>
         </div>
       </div>
@@ -152,9 +144,9 @@
 
     <!-- Center Floating Pill -->
     <div class="center-floating-pill">
-      <button class="pill-btn">All Invoices</button>
-      <button class="pill-btn">Draft <span class="pill-badge">3</span></button>
-      <button class="pill-btn active">Unpaid <span class="pill-badge dark">5</span></button>
+      <button class="pill-btn active">All Folders</button>
+      <button class="pill-btn">Syncing <span class="pill-badge">0</span></button>
+      <button class="pill-btn">Out of Sync <span class="pill-badge dark">0</span></button>
     </div>
 
     <!-- Bottom Split View -->
@@ -162,57 +154,17 @@
       <!-- Left White List -->
       <div class="list-section">
         <div class="list-header">
-          <h2>Unpaid Invoices</h2>
+          <h2>Active Folders</h2>
           <div class="list-actions">
             <button>📋</button>
             <button>⋮</button>
           </div>
         </div>
-        <div class="invoice-list">
+        <div class="invoice-list" id="folders-list">
           <div class="invoice-item">
-            <img src="https://i.pravatar.cc/100?img=12" class="item-av">
             <div class="item-id-date">
-              <span class="id"># 404-002</span>
-              <span class="date">In 2 days</span>
+              <span class="id">Loading...</span>
             </div>
-            <span class="status unsent">Unsent</span>
-            <span class="amount">$80,770.00</span>
-          </div>
-          <div class="invoice-item">
-            <img src="https://i.pravatar.cc/100?img=13" class="item-av">
-            <div class="item-id-date">
-              <span class="id"># 426-001</span>
-              <span class="date">In 4 days</span>
-            </div>
-            <span class="status viewed">Viewed</span>
-            <span class="amount">$27,114.00</span>
-          </div>
-          <div class="invoice-item active">
-            <img src="https://i.pravatar.cc/100?img=14" class="item-av">
-            <div class="item-id-date">
-              <span class="id"># 427-012</span>
-              <span class="date">In 5 days</span>
-            </div>
-            <span class="status unsent-white">Unsent</span>
-            <span class="amount">$53,154.00</span>
-          </div>
-          <div class="invoice-item">
-            <img src="https://i.pravatar.cc/100?img=15" class="item-av">
-            <div class="item-id-date">
-              <span class="id"># 424-112</span>
-              <span class="date">In 16 days</span>
-            </div>
-            <span class="status viewed">Viewed</span>
-            <span class="amount">$61,223.00</span>
-          </div>
-          <div class="invoice-item">
-            <img src="https://i.pravatar.cc/100?img=16" class="item-av">
-            <div class="item-id-date">
-              <span class="id"># 417-020</span>
-              <span class="date">In 19 days</span>
-            </div>
-            <span class="status viewed">Viewed</span>
-            <span class="amount">$7,311.00</span>
           </div>
         </div>
       </div>
@@ -221,23 +173,21 @@
       <div class="detail-section">
         <div class="detail-header-row">
           <div class="invoice-title">
-            <span class="detail-label">Invoice details</span>
+            <span class="detail-label">Folder details</span>
             <div class="detail-id-row">
-              <span class="currency">#</span> <h2>427-012</h2>
-              <span class="badge outline">Unsent</span>
+              <span class="currency">🗂️</span> <h2 id="detail-title">Select a folder</h2>
+              <span class="badge outline" id="detail-status">Unknown</span>
             </div>
           </div>
           <div class="company-info">
-            <span class="detail-label">Company</span>
-            <div class="company-logo">BlueRock ❖</div>
+            <span class="detail-label">Folder ID</span>
+            <div class="company-logo" id="detail-id" style="font-size: 13px;">-</div>
           </div>
           <div class="customer-info">
-            <span class="detail-label">Customer</span>
+            <span class="detail-label">Path</span>
             <div class="customer-profile">
-              <img src="https://i.pravatar.cc/100?img=14" class="item-av">
               <div class="customer-names">
-                <span class="name">Maria Jones</span>
-                <span class="role">CEO BlueRock Pvt Ltd.</span>
+                <span class="name" id="detail-path">-</span>
               </div>
             </div>
           </div>
@@ -246,21 +196,21 @@
         <div class="services-grid">
           <div class="service-box">
             <div class="service-top">
-              <span class="currency">$</span><span class="amount">10,630.80</span> ↗
+              <span class="amount" id="detail-global-size">0 B</span> ↗
             </div>
-            <span class="service-name">Concept Development</span>
+            <span class="service-name">Global Size</span>
           </div>
           <div class="service-box">
             <div class="service-top">
-              <span class="currency">$</span><span class="amount">31,892.40</span> ↗
+              <span class="amount" id="detail-local-size">0 B</span> ↗
             </div>
-            <span class="service-name">CRM Development</span>
+            <span class="service-name">Local Size</span>
           </div>
           <div class="service-box">
             <div class="service-top">
-              <span class="currency">$</span><span class="amount">10,630.80</span> ↗
+              <span class="amount" id="detail-files">0</span> ↗
             </div>
-            <span class="service-name">CRM Integration</span>
+            <span class="service-name">Files</span>
           </div>
           <div class="service-box add-box">
             <span class="plus">+</span>
@@ -270,26 +220,23 @@
         <div class="detail-footer">
           <div class="totals-row">
             <div class="total-col">
-              <span class="detail-label">Sub Total</span>
-              <span class="total-val"><span class="currency">$</span>53,154.00</span>
+              <span class="detail-label">Directories</span>
+              <span class="total-val" id="detail-dirs">0</span>
             </div>
             <div class="total-col">
-              <span class="detail-label">Total</span>
-              <span class="total-val"><span class="currency">$</span>53,154.00</span>
-            </div>
-            <div class="total-col">
-              <span class="detail-label">Balance Due</span>
-              <span class="total-val"><span class="currency">$</span>53,154.00</span>
+              <span class="detail-label">Last Scanned</span>
+              <span class="total-val" id="detail-scanned" style="font-size: 14px;">-</span>
             </div>
           </div>
           <div class="footer-actions">
             <button class="icon-btn-round">🔗</button>
-            <button class="icon-btn-round">📅</button>
-            <button class="pay-out-btn-green">Pay out now</button>
+            <button class="icon-btn-round">⚙️</button>
+            <button class="pay-out-btn-green">Force Rescan</button>
           </div>
         </div>
       </div>
     </div>
   </div>
+  <script src="app.js"></script>
 </body>
 </html>
