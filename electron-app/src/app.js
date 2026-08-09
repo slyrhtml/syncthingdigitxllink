@@ -59,6 +59,7 @@ function initChart() {
 async function updateDashboardData() {
   const systemStatus = await fetchAPI('/system/status');
   const connections = await fetchAPI('/system/connections');
+  const discovery = await fetchAPI('/system/discovery');
   
   if (systemStatus) {
     document.getElementById('dash-cpu').innerText = (systemStatus.cpuPercent || 0).toFixed(1) + '%';
@@ -66,11 +67,22 @@ async function updateDashboardData() {
     const hours = Math.floor(systemStatus.uptime / 3600);
     const mins = Math.floor((systemStatus.uptime % 3600) / 60);
     document.getElementById('dash-uptime').innerText = `${hours}h ${mins}m`;
+    document.getElementById('dash-goroutines').innerText = systemStatus.goroutines || 0;
+  }
+  
+  if (discovery) {
+      let isOnline = false;
+      for (const key in discovery) {
+          if (discovery[key].error === null) {
+              isOnline = true;
+          }
+      }
+      document.getElementById('dash-discovery').innerHTML = `<span class="unit" style="color: ${isOnline ? '#adff2f' : '#f39c12'};">${isOnline ? 'Online' : 'Offline'}</span>`;
   }
 
   if (connections) {
-    document.getElementById('dash-up').innerText = formatBytes(connections.total.outBytesTotal);
-    document.getElementById('dash-down').innerText = formatBytes(connections.total.inBytesTotal);
+    document.getElementById('dash-up-total').innerText = 'Up: ' + formatBytes(connections.total.outBytesTotal);
+    document.getElementById('dash-down-total').innerText = 'Down: ' + formatBytes(connections.total.inBytesTotal);
     
     // Update Chart
     if (transferChart) {
@@ -81,6 +93,73 @@ async function updateDashboardData() {
       transferChart.update();
     }
   }
+}
+
+let lastEventId = 0;
+async function updateActivityFeed() {
+  const events = await fetchAPI(`/events?since=${lastEventId}&limit=10`);
+  if (!events || events.length === 0) return;
+  
+  lastEventId = events[events.length - 1].id;
+  const feedEl = document.getElementById('dash-activity-feed');
+  if (feedEl.innerText.includes('Waiting')) feedEl.innerHTML = '';
+  
+  events.forEach(ev => {
+      const el = document.createElement('div');
+      el.style = 'font-size: 13px; color: #aaa; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.05);';
+      const time = new Date(ev.time).toLocaleTimeString();
+      let msg = ev.type;
+      if (ev.data) {
+          if (ev.data.folder) msg += ` - ${ev.data.folder}`;
+          if (ev.data.item) msg += ` - ${ev.data.item}`;
+      }
+      el.innerHTML = `<span style="color: #666;">[${time}]</span> <span style="color: var(--text-white);">${msg}</span>`;
+      feedEl.insertBefore(el, feedEl.firstChild);
+  });
+  
+  // Keep only 20 items
+  while (feedEl.children.length > 20) {
+      feedEl.removeChild(feedEl.lastChild);
+  }
+}
+
+async function updateFleetSummary() {
+    const config = await fetchAPI('/system/config');
+    const connections = await fetchAPI('/system/connections');
+    if (!config || !connections) return;
+    
+    // Devices
+    let devOk = 0, devOff = 0;
+    config.devices.forEach(d => {
+        if (connections.connections[d.deviceID]?.connected) devOk++;
+        else devOff++;
+    });
+    document.getElementById('fleet-devices-ok').innerText = devOk;
+    document.getElementById('fleet-devices-off').innerText = devOff;
+    
+    // Folders & Storage
+    let foldOk = 0, foldSync = 0, foldErr = 0;
+    let locBytes = 0, globBytes = 0;
+    
+    for (const f of config.folders) {
+        const db = await fetchAPI(`/db/status?folder=${f.id}`);
+        if (db) {
+            locBytes += db.localBytes;
+            globBytes += db.globalBytes;
+            if (db.state === 'idle') foldOk++;
+            else if (db.state === 'syncing') foldSync++;
+            else foldErr++;
+        }
+    }
+    
+    document.getElementById('fleet-folders-ok').innerText = foldOk;
+    document.getElementById('fleet-folders-sync').innerText = foldSync;
+    document.getElementById('fleet-folders-err').innerText = foldErr;
+    
+    document.getElementById('dash-storage-local').innerText = 'Local: ' + formatBytes(locBytes);
+    document.getElementById('dash-storage-global').innerText = 'Global: ' + formatBytes(globBytes);
+    const pct = globBytes > 0 ? Math.min(100, Math.max(0, (locBytes / globBytes) * 100)) : 100;
+    document.getElementById('dash-storage-bar').style.width = pct + '%';
 }
 
 async function loadDevices() {
@@ -197,8 +276,12 @@ async function loadFolders() {
 
 // Master Loop
 async function tick() {
-  await updateDashboardData();
   const activeView = document.querySelector('.view-content.active').id;
+  if (activeView === 'view-dashboard') {
+      await updateDashboardData();
+      await updateFleetSummary();
+      await updateActivityFeed();
+  }
   if (activeView === 'view-folders') await loadFolders();
   if (activeView === 'view-devices') await loadDevices();
 }

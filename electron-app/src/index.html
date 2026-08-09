@@ -55,26 +55,88 @@
         <div class="title-section"><h1>System Dashboard</h1></div>
       </div>
       
-      <div class="top-cards" style="margin-bottom: 24px;">
-        <div class="card metrics-wide-card" style="flex: 1;">
-          <div class="metrics-row">
-            <div class="metric"><span class="label">CPU Usage</span><span class="value" id="dash-cpu">0%</span></div>
-            <div class="metric"><span class="label">RAM Usage</span><span class="value" id="dash-ram">0 MB</span></div>
-            <div class="metric"><span class="label">Uptime</span><span class="value" id="dash-uptime">0h 0m</span></div>
-          </div>
-        </div>
-        <div class="card payout-card" style="flex: 1;">
-          <div class="payout-header"><span class="label">Total Network Traffic</span></div>
-          <div class="payment-methods">
-            <div class="method-box active"><span class="method-num" id="dash-up">0 B</span><span class="method-name">Total Up</span></div>
-            <div class="method-box active"><span class="method-num" id="dash-down">0 B</span><span class="method-name">Total Down</span></div>
-          </div>
-        </div>
+      <!-- System Health Bar -->
+      <div class="card metrics-wide-card" style="margin-bottom: 24px; display: flex; flex-direction: row; gap: 32px; padding: 24px;">
+        <div class="metric"><span class="label">CPU Usage</span><span class="value" id="dash-cpu">0%</span></div>
+        <div class="metric"><span class="label">RAM Usage</span><span class="value" id="dash-ram">0 MB</span></div>
+        <div class="metric"><span class="label">Uptime</span><span class="value" id="dash-uptime">0h 0m</span></div>
+        <div class="metric"><span class="label">Goroutines</span><span class="value" id="dash-goroutines">0</span></div>
+        <div class="metric"><span class="label">Discovery</span><span class="value" id="dash-discovery">Online</span></div>
       </div>
 
-      <div class="card chart-card" style="width: 100%; height: 350px; padding: 24px;">
-        <h3 style="color: var(--text-grey); margin-bottom: 16px; font-weight: 500;">Live Transfer Rates</h3>
-        <canvas id="transferChart"></canvas>
+      <div class="dashboard-grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px;">
+        
+        <!-- Left Column: Network & Storage -->
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+          <!-- Network Hub -->
+          <div class="card chart-card" style="height: 350px; padding: 24px; display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
+              <h3 style="color: var(--text-grey); font-weight: 500;">Live Network Traffic</h3>
+              <div style="display: flex; gap: 16px;">
+                <span style="font-size: 13px; color: #adff2f;" id="dash-up-total">Up: 0 B</span>
+                <span style="font-size: 13px; color: #f39c12;" id="dash-down-total">Down: 0 B</span>
+              </div>
+            </div>
+            <div style="flex: 1; min-height: 0;">
+              <canvas id="transferChart"></canvas>
+            </div>
+          </div>
+
+          <!-- Storage Footprint -->
+          <div class="card" style="padding: 24px;">
+            <h3 style="color: var(--text-grey); font-weight: 500; margin-bottom: 16px;">Storage Footprint</h3>
+            <div class="timeline" style="margin: 0;">
+              <div class="timeline-labels" style="justify-content: space-between; margin-bottom: 8px;">
+                <span id="dash-storage-local">Local: 0 B</span>
+                <span id="dash-storage-global">Global: 0 B</span>
+              </div>
+              <div class="timeline-bar-bg">
+                <div class="timeline-bar green-1" id="dash-storage-bar" style="width: 50%; left: 0;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Fleet & Activity -->
+        <div style="display: flex; flex-direction: column; gap: 24px;">
+          <!-- Fleet Summary -->
+          <div class="card" style="padding: 24px;">
+            <h3 style="color: var(--text-grey); font-weight: 500; margin-bottom: 16px;">Fleet Summary</h3>
+            <div style="display: flex; flex-direction: column; gap: 16px;">
+              <div class="fleet-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-white); font-size: 14px;">Folders Up to Date</span>
+                <span class="badge outline" id="fleet-folders-ok">0</span>
+              </div>
+              <div class="fleet-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-white); font-size: 14px;">Folders Syncing</span>
+                <span class="badge expects-badge" id="fleet-folders-sync">0</span>
+              </div>
+              <div class="fleet-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-white); font-size: 14px;">Folders Error/Paused</span>
+                <span class="badge dark" id="fleet-folders-err">0</span>
+              </div>
+              <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.1);">
+              <div class="fleet-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-white); font-size: 14px;">Devices Connected</span>
+                <span class="badge outline" id="fleet-devices-ok">0</span>
+              </div>
+              <div class="fleet-row" style="display: flex; justify-content: space-between; align-items: center;">
+                <span style="color: var(--text-white); font-size: 14px;">Devices Offline</span>
+                <span class="badge dark" id="fleet-devices-off">0</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent Activity -->
+          <div class="card" style="padding: 24px; flex: 1; display: flex; flex-direction: column;">
+            <h3 style="color: var(--text-grey); font-weight: 500; margin-bottom: 16px;">Recent Activity</h3>
+            <div id="dash-activity-feed" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
+              <!-- JS rendered events -->
+              <span style="color: #666; font-size: 13px;">Waiting for events...</span>
+            </div>
+          </div>
+        </div>
+
       </div>
     </div>
 
