@@ -104,3 +104,36 @@ document.addEventListener('DOMContentLoaded', loadDashboard);
 
 // Refresh data every 5 seconds
 setInterval(loadDashboard, 5000);
+
+// Routing Logic
+document.addEventListener('DOMContentLoaded', () => {
+  const navItems = document.querySelectorAll('.nav-item[data-target]');
+  const views = document.querySelectorAll('.view-content');
+
+  navItems.forEach(item => {
+    item.addEventListener('click', () => {
+      // 1. Remove active state and dot from all nav items
+      navItems.forEach(nav => {
+        nav.classList.remove('active');
+        const dot = nav.querySelector('.dot');
+        if (dot) dot.remove();
+      });
+
+      // 2. Add active state and dot to clicked item
+      item.classList.add('active');
+      if (!item.querySelector('.dot')) {
+        item.insertAdjacentHTML('afterbegin', '<span class="dot"></span> ');
+      }
+
+      // 3. Hide all views, show targeted view
+      const targetId = item.getAttribute('data-target');
+      views.forEach(view => {
+        if (view.id === targetId) {
+          view.classList.add('active');
+        } else {
+          view.classList.remove('active');
+        }
+      });
+    });
+  });
+});

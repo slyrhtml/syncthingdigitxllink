@@ -89,8 +89,8 @@ body {
 
 .nav-item {
   background: transparent;
-  border: none;
-  padding: 8px 16px;
+  border: 2px solid transparent;
+  padding: 6px 14px; /* adjusted to account for border */
   border-radius: 20px;
   font-weight: 500;
   font-size: 13px;
@@ -99,11 +99,18 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
+  transition: all 0.2s ease;
+}
+
+.nav-item:not(.active):hover, .nav-item:not(.active):focus {
+  border-color: #f39c12; /* orange border as per screenshot */
+  outline: none;
 }
 
 .nav-item.active {
   background-color: var(--neon-green);
   color: var(--text-dark);
+  border-color: var(--neon-green);
 }
 
 .nav-item .dot {
@@ -117,6 +124,31 @@ body {
   display: flex;
   align-items: center;
   gap: 24px;
+}
+
+/* ROUTING VIEWS */
+.view-content {
+  display: none;
+  flex-direction: column;
+  gap: 24px;
+}
+.view-content.active {
+  display: flex;
+}
+
+.placeholder-view {
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-height: 400px;
+  background-color: var(--card-bg);
+  border-radius: var(--radius-lg);
+  color: var(--text-grey);
+}
+.placeholder-view h1 {
+  font-size: 32px;
+  color: var(--text-white);
+  margin-bottom: 12px;
 }
 
 .icon-group {

@@ -23,11 +23,11 @@
         <div class="grid-icon">80</div>
         <div class="nav-pill-container">
           <button class="nav-icon-btn"><svg viewBox="0 0 24 24" width="16" height="16" fill="white"><rect x="3" y="5" width="18" height="14" rx="2"/></svg></button>
-          <button class="nav-item">Dashboard</button>
-          <button class="nav-item active"><span class="dot"></span> Folders</button>
-          <button class="nav-item">Devices</button>
-          <button class="nav-item">Settings</button>
-          <button class="nav-item">Advanced</button>
+          <button class="nav-item" data-target="view-dashboard">Dashboard</button>
+          <button class="nav-item active" data-target="view-folders"><span class="dot"></span> Folders</button>
+          <button class="nav-item" data-target="view-devices">Devices</button>
+          <button class="nav-item" data-target="view-settings">Settings</button>
+          <button class="nav-item" data-target="view-advanced">Advanced</button>
         </div>
       </div>
 
@@ -47,6 +47,29 @@
         </div>
       </div>
     </header>
+
+    <div id="view-dashboard" class="view-content placeholder-view">
+      <h1>Dashboard</h1>
+      <p>Metrics and graphs coming soon.</p>
+    </div>
+
+    <div id="view-devices" class="view-content placeholder-view">
+      <h1>Devices</h1>
+      <p>Device management coming soon.</p>
+    </div>
+
+    <div id="view-settings" class="view-content placeholder-view">
+      <h1>Settings</h1>
+      <p>Configuration options coming soon.</p>
+    </div>
+
+    <div id="view-advanced" class="view-content placeholder-view">
+      <h1>Advanced</h1>
+      <p>Advanced controls coming soon.</p>
+    </div>
+
+    <!-- Folders View -->
+    <div id="view-folders" class="view-content active">
 
     <!-- Header Title -->
     <div class="page-header">
@@ -234,9 +257,10 @@
             <button class="pay-out-btn-green">Force Rescan</button>
           </div>
         </div>
-      </div>
-    </div>
-  </div>
+    </div> <!-- End Detail Section -->
+    </div> <!-- End Bottom Split -->
+    </div> <!-- End view-folders -->
+  </div> <!-- End app-container -->
   <script src="app.js"></script>
 </body>
 </html>
