@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="app-container">
@@ -48,24 +49,83 @@
       </div>
     </header>
 
-    <div id="view-dashboard" class="view-content placeholder-view">
-      <h1>Dashboard</h1>
-      <p>Metrics and graphs coming soon.</p>
+    <!-- Dashboard View -->
+    <div id="view-dashboard" class="view-content placeholder-view" style="justify-content: flex-start; align-items: stretch; background: transparent; padding: 0;">
+      <div class="page-header">
+        <div class="title-section"><h1>System Dashboard</h1></div>
+      </div>
+      
+      <div class="top-cards" style="margin-bottom: 24px;">
+        <div class="card metrics-wide-card" style="flex: 1;">
+          <div class="metrics-row">
+            <div class="metric"><span class="label">CPU Usage</span><span class="value" id="dash-cpu">0%</span></div>
+            <div class="metric"><span class="label">RAM Usage</span><span class="value" id="dash-ram">0 MB</span></div>
+            <div class="metric"><span class="label">Uptime</span><span class="value" id="dash-uptime">0h 0m</span></div>
+          </div>
+        </div>
+        <div class="card payout-card" style="flex: 1;">
+          <div class="payout-header"><span class="label">Total Network Traffic</span></div>
+          <div class="payment-methods">
+            <div class="method-box active"><span class="method-num" id="dash-up">0 B</span><span class="method-name">Total Up</span></div>
+            <div class="method-box active"><span class="method-num" id="dash-down">0 B</span><span class="method-name">Total Down</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card chart-card" style="width: 100%; height: 350px; padding: 24px;">
+        <h3 style="color: var(--text-grey); margin-bottom: 16px; font-weight: 500;">Live Transfer Rates</h3>
+        <canvas id="transferChart"></canvas>
+      </div>
     </div>
 
-    <div id="view-devices" class="view-content placeholder-view">
-      <h1>Devices</h1>
-      <p>Device management coming soon.</p>
+    <!-- Devices View -->
+    <div id="view-devices" class="view-content placeholder-view" style="justify-content: flex-start; align-items: stretch; background: transparent; padding: 0;">
+      <div class="page-header">
+        <div class="title-section"><h1>Connected Devices</h1></div>
+        <div class="action-section"><button class="create-btn">Add Device</button></div>
+      </div>
+      <div class="grid-layout" id="devices-grid">
+        <!-- Rendered via JS -->
+      </div>
     </div>
 
-    <div id="view-settings" class="view-content placeholder-view">
-      <h1>Settings</h1>
-      <p>Configuration options coming soon.</p>
+    <!-- Settings View -->
+    <div id="view-settings" class="view-content placeholder-view" style="justify-content: flex-start; align-items: stretch; background: transparent; padding: 0;">
+      <div class="page-header">
+        <div class="title-section"><h1>Configuration</h1></div>
+      </div>
+      <div class="card form-card">
+        <div class="form-group">
+          <label>Device Name</label>
+          <input type="text" id="setting-device-name" class="styled-input">
+        </div>
+        <div class="form-group">
+          <label>Listen Addresses</label>
+          <input type="text" id="setting-listen" class="styled-input">
+        </div>
+        <div class="form-group">
+          <label>GUI Address</label>
+          <input type="text" id="setting-gui" class="styled-input">
+        </div>
+        <div class="form-group">
+          <label>API Key</label>
+          <input type="text" id="setting-api" class="styled-input" readonly>
+        </div>
+        <button class="pay-out-btn-green" style="align-self: flex-start; margin-top: 16px;" id="save-settings-btn">Save Changes</button>
+      </div>
     </div>
 
-    <div id="view-advanced" class="view-content placeholder-view">
-      <h1>Advanced</h1>
-      <p>Advanced controls coming soon.</p>
+    <!-- Advanced View -->
+    <div id="view-advanced" class="view-content placeholder-view" style="justify-content: flex-start; align-items: stretch; background: transparent; padding: 0;">
+      <div class="page-header">
+        <div class="title-section"><h1>Advanced</h1></div>
+      </div>
+      <div class="card form-card">
+        <p style="color: var(--text-grey); margin-bottom: 16px;">System Errors & Logs</p>
+        <div id="advanced-logs" class="logs-container">
+          Loading...
+        </div>
+      </div>
     </div>
 
     <!-- Folders View -->

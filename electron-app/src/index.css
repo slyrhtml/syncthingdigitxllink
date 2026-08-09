@@ -765,3 +765,83 @@ body {
   font-size: 14px;
   cursor: pointer;
 }
+
+/* NEW PAGES STYLES */
+.grid-layout {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+  width: 100%;
+}
+
+.device-card {
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  background-color: var(--card-bg);
+  border-radius: var(--radius-lg);
+  border: 1px solid rgba(255,255,255,0.05);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+
+.device-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.device-card-header h3 {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-white);
+  margin: 0;
+}
+
+.form-card {
+  padding: 32px;
+  max-width: 800px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 24px;
+}
+
+.form-group label {
+  font-size: 13px;
+  color: var(--text-grey);
+  font-weight: 500;
+}
+
+.styled-input {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 12px 16px;
+  color: var(--text-white);
+  font-family: 'Inter', sans-serif;
+  font-size: 14px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.styled-input:focus {
+  border-color: var(--neon-green);
+  box-shadow: 0 0 0 2px rgba(173, 255, 47, 0.2);
+}
+
+.logs-container {
+  background-color: #0b0b0f;
+  border-radius: 8px;
+  padding: 16px;
+  font-family: monospace;
+  font-size: 12px;
+  color: #888;
+  height: 400px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  border: 1px solid rgba(255,255,255,0.05);
+}
