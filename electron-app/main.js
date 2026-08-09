@@ -15,11 +15,12 @@ function createWindow() {
     width: 1200,
     height: 800,
     webPreferences: {
-      nodeIntegration: false
+      nodeIntegration: false,
+      contextIsolation: true
     }
   });
 
-  mainWindow.loadURL('http://127.0.0.1:8384');
+  mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
 
   mainWindow.on('closed', function () {
     mainWindow = null;
@@ -27,8 +28,15 @@ function createWindow() {
 }
 
 function checkSyncthingHealth(callback) {
-  const req = http.get('http://127.0.0.1:8384', (res) => {
-    if (res.statusCode === 200 || res.statusCode === 302 || res.statusCode === 401 || res.statusCode === 403) {
+  const req = http.get({
+    hostname: '127.0.0.1',
+    port: 8384,
+    path: '/rest/system/status',
+    headers: {
+      'X-API-Key': 'electron-ui-key'
+    }
+  }, (res) => {
+    if (res.statusCode === 200) {
       callback(true);
     } else {
       callback(false);
@@ -52,11 +60,8 @@ function waitForSyncthingAndStart() {
 }
 
 app.on('ready', () => {
-  // Start Syncthing in the background
-  // -no-browser prevents it from opening a default web browser
-  // --home=./config isolates the configuration so we don't conflict with existing setups
   console.log(`Starting Syncthing from: ${syncthingBinary}`);
-  syncthingProcess = spawn(syncthingBinary, ['--no-browser'], {
+  syncthingProcess = spawn(syncthingBinary, ['--no-browser', '--gui-apikey=electron-ui-key'], {
     stdio: 'inherit'
   });
 
