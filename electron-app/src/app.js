@@ -17,6 +17,12 @@ let foldersViewData = [];
 let selectedFolderId = null;
 let activeFolderFilter = 'all';
 let folderSearchTerm = '';
+let devicesViewData = [];
+let selectedDeviceId = null;
+let activeDeviceFilter = 'all';
+let deviceSearchTerm = '';
+let deviceFoldersSnapshot = [];
+let pendingDevicesSnapshot = {};
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DASHBOARD_EVENT_CACHE_KEY = 'syncthing-dashboard-events-v1';
@@ -86,7 +92,23 @@ async function postJSON(endpoint, body) {
     return { ok: true };
   } catch (error) {
     console.error(`Error posting ${endpoint}:`, error);
-    return { ok: false, error: error.message || 'Could not create the folder.' };
+    return { ok: false, error: error.message || 'The request could not be completed.' };
+  }
+}
+
+async function requestJSON(endpoint, method, body) {
+  try {
+    const options = { method, headers };
+    if (body !== undefined) options.body = JSON.stringify(body);
+    const response = await fetch(`${API_URL}${endpoint}`, options);
+    if (!response.ok) {
+      const message = (await response.text()).trim();
+      throw new Error(message || `HTTP error! status: ${response.status}`);
+    }
+    return { ok: true };
+  } catch (error) {
+    console.error(`Error ${method} ${endpoint}:`, error);
+    return { ok: false, error: error.message || 'The request could not be completed.' };
   }
 }
 
@@ -479,34 +501,350 @@ async function updateFleetSummary() {
       : 'No shared data yet';
 }
 
-async function loadDevices() {
-  const config = await fetchAPI('/system/config');
-  const stats = await fetchAPI('/stats/device');
-  const connections = await fetchAPI('/system/connections');
-  
-  if (!config || !stats || !connections) return;
-  
-  const grid = document.getElementById('devices-grid');
-  grid.innerHTML = '';
+function normalizeDeviceID(value) {
+  const compact = String(value || '').toUpperCase().replace(/[^A-Z2-7]/g, '');
+  if (compact.length !== 56) return String(value || '').trim().toUpperCase();
+  return compact.match(/.{1,7}/g).join('-');
+}
 
-  config.devices.forEach(device => {
-    const isConnected = connections.connections[device.deviceID]?.connected;
-    const deviceStats = stats[device.deviceID];
-    const lastSeen = deviceStats?.lastSeen ? new Date(deviceStats.lastSeen).toLocaleString() : 'Never';
-    
-    grid.innerHTML += `
-      <div class="device-card">
-        <div class="device-card-header">
-          <h3>${device.name || 'Unknown Device'}</h3>
-          <span class="badge ${isConnected ? 'outline' : 'dark'}">${isConnected ? 'Connected' : 'Offline'}</span>
-        </div>
-        <p style="color: #888; font-size: 12px; margin-bottom: 16px; word-break: break-all;">${device.deviceID}</p>
-        <div style="display: flex; justify-content: space-between; font-size: 13px; color: #ccc;">
-          <span>Last Seen:</span> <span>${lastSeen}</span>
-        </div>
-      </div>
-    `;
+function isValidDeviceID(value) {
+  return /^[A-Z2-7]{7}(?:-[A-Z2-7]{7}){7}$/.test(normalizeDeviceID(value));
+}
+
+function validDeviceDate(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime()) || date.getUTCFullYear() <= 1970) return null;
+  return date;
+}
+
+function deviceInitials(name) {
+  return String(name || 'Remote device')
+    .split(/\s+/)
+    .filter(Boolean)
+    .map(part => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() || 'RD';
+}
+
+function deviceConnectionState(device, connection) {
+  if (device.paused || connection?.paused) return { key: 'paused', label: 'Paused' };
+  if (connection?.connected) return { key: 'online', label: 'Online' };
+  return { key: 'offline', label: 'Offline' };
+}
+
+function formatConnectionType(value) {
+  if (!value) return '—';
+  const [protocol, direction] = value.split('-');
+  const protocolName = protocol === 'quic' ? 'QUIC' : protocol === 'tcp' ? 'TCP' : protocol === 'relay' ? 'Relay' : protocol.toUpperCase();
+  return direction ? `${protocolName} ${direction}` : protocolName;
+}
+
+function formatCompression(value) {
+  const labels = { always: 'All data', metadata: 'Metadata only', never: 'Disabled' };
+  return labels[value] || 'Metadata only';
+}
+
+function renderPendingDevices() {
+  const panel = document.getElementById('pending-devices');
+  const list = document.getElementById('pending-device-list');
+  if (!panel || !list) return;
+
+  const pending = Object.entries(pendingDevicesSnapshot || {});
+  panel.hidden = pending.length === 0;
+  list.replaceChildren();
+  pending.forEach(([id, details]) => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = 'pending-device-row';
+    const avatar = document.createElement('span');
+    avatar.innerText = deviceInitials(details.name);
+    const copy = document.createElement('span');
+    const name = document.createElement('b');
+    name.innerText = details.name || 'Nearby Syncthing device';
+    const code = document.createElement('code');
+    code.innerText = id;
+    copy.append(name, code);
+    const action = document.createElement('small');
+    action.innerText = 'Use device';
+    row.append(avatar, copy, action);
+    row.addEventListener('click', () => {
+      document.getElementById('add-device-id').value = id;
+      document.getElementById('add-device-name').value = details.name || '';
+      document.getElementById('add-device-id').dispatchEvent(new Event('input'));
+    });
+    list.appendChild(row);
   });
+}
+
+function renderDeviceFolderOptions() {
+  const options = document.getElementById('add-device-folder-options');
+  if (!options) return;
+  options.replaceChildren();
+  if (deviceFoldersSnapshot.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'device-folder-options-empty';
+    empty.innerText = 'No folders are configured yet.';
+    options.appendChild(empty);
+    return;
+  }
+
+  deviceFoldersSnapshot.forEach(folder => {
+    const label = document.createElement('label');
+    label.className = 'device-folder-option';
+    const checkbox = document.createElement('input');
+    checkbox.type = 'checkbox';
+    checkbox.value = folder.id;
+    checkbox.name = 'device-folder';
+    const copy = document.createElement('span');
+    const name = document.createElement('b');
+    name.innerText = folder.label || folder.id;
+    const id = document.createElement('small');
+    id.innerText = folder.id;
+    copy.append(name, id);
+    label.append(checkbox, copy);
+    options.appendChild(label);
+  });
+}
+
+function renderDeviceList() {
+  const list = document.getElementById('devices-list');
+  if (!list) return;
+  const normalizedSearch = deviceSearchTerm.trim().toLowerCase();
+  const visibleDevices = devicesViewData.filter(item => {
+    const matchesFilter = activeDeviceFilter === 'all' || item.state.key === activeDeviceFilter;
+    const searchText = `${item.name} ${item.device.deviceID} ${item.connection?.address || ''}`.toLowerCase();
+    return matchesFilter && (!normalizedSearch || searchText.includes(normalizedSearch));
+  });
+
+  document.getElementById('devices-visible-count').innerText = visibleDevices.length === devicesViewData.length
+    ? `${formatCount(visibleDevices.length)} ${visibleDevices.length === 1 ? 'device' : 'devices'}`
+    : `Showing ${formatCount(visibleDevices.length)} of ${formatCount(devicesViewData.length)}`;
+
+  list.replaceChildren();
+  if (visibleDevices.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'device-list-empty';
+    empty.innerText = devicesViewData.length === 0
+      ? 'No remote devices configured. Add one to begin pairing.'
+      : 'No devices match this filter.';
+    list.appendChild(empty);
+    selectedDeviceId = null;
+    return;
+  }
+
+  if (!visibleDevices.some(item => item.device.deviceID === selectedDeviceId)) {
+    selectedDeviceId = visibleDevices[0].device.deviceID;
+  }
+
+  visibleDevices.forEach(item => {
+    const row = document.createElement('button');
+    row.type = 'button';
+    row.className = `device-row ${item.state.key}${item.device.deviceID === selectedDeviceId ? ' active' : ''}`;
+    row.dataset.deviceId = item.device.deviceID;
+
+    const main = document.createElement('div');
+    main.className = 'device-row-main';
+    const avatar = document.createElement('span');
+    avatar.className = 'device-row-avatar';
+    avatar.innerText = deviceInitials(item.name);
+    const copy = document.createElement('span');
+    copy.className = 'device-row-copy';
+    const name = document.createElement('span');
+    name.className = 'device-row-name';
+    name.innerText = item.name;
+    const id = document.createElement('span');
+    id.className = 'device-row-id';
+    id.innerText = item.device.deviceID;
+    copy.append(name, id);
+    const status = document.createElement('span');
+    status.className = `device-state-badge ${item.state.key}`;
+    const dot = document.createElement('i');
+    const statusText = document.createElement('span');
+    statusText.innerText = item.state.label;
+    status.append(dot, statusText);
+    main.append(avatar, copy, status);
+
+    const meta = document.createElement('div');
+    meta.className = 'device-row-meta';
+    const folders = document.createElement('span');
+    folders.innerText = `${formatCount(item.sharedFolders.length)} shared ${item.sharedFolders.length === 1 ? 'folder' : 'folders'}`;
+    const traffic = document.createElement('span');
+    traffic.innerText = `${formatBytes(Number(item.connection?.inBytesTotal || 0) + Number(item.connection?.outBytesTotal || 0))} transferred`;
+    const seen = document.createElement('span');
+    seen.innerText = item.state.key === 'online' ? 'Connected now' : item.lastSeen ? formatRelativeTime(item.lastSeen) : 'Never seen';
+    meta.append(folders, traffic, seen);
+
+    row.append(main, meta);
+    row.addEventListener('click', () => {
+      selectedDeviceId = item.device.deviceID;
+      renderDeviceList();
+      renderDeviceDetail();
+    });
+    list.appendChild(row);
+  });
+}
+
+function renderDeviceDetail() {
+  const selected = devicesViewData.find(item => item.device.deviceID === selectedDeviceId);
+  const empty = document.getElementById('device-detail-empty');
+  const content = document.getElementById('device-detail-content');
+  if (!selected) {
+    empty.hidden = false;
+    content.hidden = true;
+    return;
+  }
+
+  empty.hidden = true;
+  content.hidden = false;
+  const { device, connection, state, name, sharedFolders, lastSeen } = selected;
+  const startedAt = validDeviceDate(connection?.startedAt);
+  const connectionAt = validDeviceDate(connection?.at);
+  const route = connection?.isLocal ? 'Local network' : connection?.connected ? 'Remote network' : 'No active route';
+
+  document.getElementById('device-detail-avatar').innerText = deviceInitials(name);
+  document.getElementById('device-detail-name').innerText = name;
+  document.getElementById('device-detail-id').innerText = device.deviceID;
+  const status = document.getElementById('device-detail-status');
+  status.className = `device-state-badge ${state.key}`;
+  status.innerHTML = '<i></i>';
+  status.appendChild(document.createTextNode(state.label));
+
+  const banner = document.getElementById('device-connection-banner');
+  banner.className = `device-connection-banner ${state.key}`;
+  if (state.key === 'online') {
+    document.getElementById('device-connection-title').innerText = `Connected via ${formatConnectionType(connection.type)}`;
+    document.getElementById('device-connection-copy').innerText = startedAt
+      ? `Connection active since ${startedAt.toLocaleString()}. Syncthing is ready to exchange data.`
+      : 'Syncthing is ready to exchange data with this device.';
+  } else if (state.key === 'paused') {
+    document.getElementById('device-connection-title').innerText = 'Connection paused';
+    document.getElementById('device-connection-copy').innerText = 'Resume this device to allow discovery and synchronization.';
+  } else {
+    document.getElementById('device-connection-title').innerText = 'Waiting for connection';
+    document.getElementById('device-connection-copy').innerText = 'Syncthing will connect automatically when both devices approve each other.';
+  }
+  document.getElementById('device-last-seen').innerText = state.key === 'online'
+    ? 'Online now'
+    : lastSeen ? `Last seen ${formatRelativeTime(lastSeen)}` : connectionAt ? `Last attempt ${formatRelativeTime(connectionAt)}` : 'Never seen';
+
+  document.getElementById('device-bytes-received').innerText = formatBytes(connection?.inBytesTotal || 0);
+  document.getElementById('device-bytes-sent').innerText = formatBytes(connection?.outBytesTotal || 0);
+  document.getElementById('device-shared-count').innerText = formatCount(sharedFolders.length);
+  document.getElementById('device-shared-copy').innerText = sharedFolders.length === 0
+    ? 'No folders shared'
+    : `${formatBytes(sharedFolders.reduce((total, folder) => total + Number(folder.globalBytes || 0), 0))} indexed`;
+  document.getElementById('device-connection-type').innerText = formatConnectionType(connection?.type);
+  document.getElementById('device-connection-location').innerText = route;
+  document.getElementById('device-address').innerText = connection?.address || device.addresses?.join(', ') || 'Dynamic';
+  document.getElementById('device-client-version').innerText = connection?.clientVersion || 'Unknown';
+  document.getElementById('device-compression').innerText = formatCompression(device.compression);
+  document.getElementById('device-introducer').innerText = device.introducer ? 'Enabled' : 'No';
+  document.getElementById('device-auto-accept').innerText = device.autoAcceptFolders ? 'Enabled' : 'Off';
+  document.getElementById('device-folder-count').innerText = `${formatCount(sharedFolders.length)} ${sharedFolders.length === 1 ? 'folder' : 'folders'}`;
+
+  const pauseButton = document.getElementById('device-pause-btn');
+  pauseButton.innerText = device.paused ? 'Resume device' : 'Pause device';
+
+  const folderList = document.getElementById('device-folder-list');
+  folderList.replaceChildren();
+  if (sharedFolders.length === 0) {
+    const noFolders = document.createElement('div');
+    noFolders.className = 'device-no-folders';
+    noFolders.innerText = 'No folders are shared with this device.';
+    folderList.appendChild(noFolders);
+  } else {
+    sharedFolders.forEach(folder => {
+      const row = document.createElement('div');
+      row.className = 'device-folder-row';
+      const icon = document.createElement('span');
+      icon.className = 'device-folder-icon';
+      icon.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5h6l2 2H21v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M3 7.5V6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1.5"></path></svg>';
+      const copy = document.createElement('span');
+      copy.className = 'device-folder-copy';
+      const folderName = document.createElement('span');
+      folderName.innerText = folder.label || folder.id;
+      const folderMeta = document.createElement('small');
+      folderMeta.innerText = `${formatBytes(folder.globalBytes || 0)} · ${formatCount(folder.globalFiles || 0)} files`;
+      copy.append(folderName, folderMeta);
+      const id = document.createElement('code');
+      id.innerText = folder.id;
+      row.append(icon, copy, id);
+      folderList.appendChild(row);
+    });
+  }
+}
+
+async function loadDevices() {
+  const [config, systemStatus, stats, connections, pending] = await Promise.all([
+    fetchAPI('/system/config'),
+    fetchAPI('/system/status'),
+    fetchAPI('/stats/device'),
+    fetchAPI('/system/connections'),
+    fetchAPI('/cluster/pending/devices')
+  ]);
+  if (!config || !systemStatus) return;
+
+  localDeviceId = systemStatus.myID || localDeviceId;
+  const devices = Array.isArray(config.devices) ? config.devices : [];
+  const folders = Array.isArray(config.folders) ? config.folders : [];
+  const remoteDevices = devices.filter(device => device.deviceID !== localDeviceId);
+  const localDevice = devices.find(device => device.deviceID === localDeviceId);
+  const statuses = await Promise.all(folders.map(folder => fetchAPI(`/db/status?folder=${encodeURIComponent(folder.id)}`)));
+  deviceFoldersSnapshot = folders;
+  pendingDevicesSnapshot = pending || {};
+
+  devicesViewData = remoteDevices.map(device => {
+    const connection = connections?.connections?.[device.deviceID] || null;
+    const deviceStats = stats?.[device.deviceID] || null;
+    const sharedFolders = folders
+      .map((folder, index) => ({
+        ...folder,
+        globalBytes: statuses[index]?.globalBytes || 0,
+        globalFiles: statuses[index]?.globalFiles || 0
+      }))
+      .filter(folder => (folder.devices || []).some(reference => reference.deviceID === device.deviceID));
+    return {
+      device,
+      connection,
+      stats: deviceStats,
+      name: device.name || 'Remote device',
+      state: deviceConnectionState(device, connection),
+      lastSeen: validDeviceDate(deviceStats?.lastSeen),
+      sharedFolders
+    };
+  });
+
+  const onlineCount = devicesViewData.filter(item => item.state.key === 'online').length;
+  const pausedCount = devicesViewData.filter(item => item.state.key === 'paused').length;
+  const offlineCount = devicesViewData.filter(item => item.state.key === 'offline').length;
+  const sharedFolderCount = folders.filter(folder => (folder.devices || []).some(reference => reference.deviceID !== localDeviceId)).length;
+  const sessionTraffic = devicesViewData.reduce((total, item) => total + Number(item.connection?.inBytesTotal || 0) + Number(item.connection?.outBytesTotal || 0), 0);
+
+  document.getElementById('local-device-title').innerText = localDevice?.name || 'Local Syncthing';
+  document.getElementById('local-device-id').innerText = localDeviceId || 'Device ID unavailable';
+  document.getElementById('devices-summary-total').innerText = formatCount(remoteDevices.length);
+  document.getElementById('devices-summary-connection-copy').innerText = remoteDevices.length === 0
+    ? 'No devices configured'
+    : `${formatCount(onlineCount)} online · ${formatCount(offlineCount + pausedCount)} unavailable`;
+  document.getElementById('devices-summary-online').innerText = formatCount(onlineCount);
+  document.getElementById('devices-summary-folders').innerText = formatCount(sharedFolderCount);
+  document.getElementById('devices-summary-traffic').innerText = formatBytes(sessionTraffic);
+  document.getElementById('device-filter-all-count').innerText = formatCount(remoteDevices.length);
+  document.getElementById('device-filter-online-count').innerText = formatCount(onlineCount);
+  document.getElementById('device-filter-offline-count').innerText = formatCount(offlineCount);
+  document.getElementById('device-filter-paused-count').innerText = formatCount(pausedCount);
+
+  if (!devicesViewData.some(item => item.device.deviceID === selectedDeviceId)) {
+    selectedDeviceId = devicesViewData[0]?.device.deviceID || null;
+  }
+  if (document.getElementById('add-device-modal')?.hidden !== false) {
+    renderPendingDevices();
+    renderDeviceFolderOptions();
+  }
+  renderDeviceList();
+  renderDeviceDetail();
 }
 
 async function loadSettings() {
@@ -853,11 +1191,35 @@ document.addEventListener('DOMContentLoaded', () => {
   const addFolderPath = document.getElementById('add-folder-path');
   const addFolderError = document.getElementById('add-folder-error');
   const addFolderSubmit = document.getElementById('add-folder-submit');
+  const addDeviceModal = document.getElementById('add-device-modal');
+  const addDeviceForm = document.getElementById('add-device-form');
+  const addDeviceId = document.getElementById('add-device-id');
+  const addDeviceName = document.getElementById('add-device-name');
+  const addDeviceError = document.getElementById('add-device-error');
+  const addDeviceSubmit = document.getElementById('add-device-submit');
   let folderIdEdited = false;
 
   const closeAddFolderModal = () => {
     addFolderModal.hidden = true;
     addFolderError.innerText = '';
+  };
+
+  const closeAddDeviceModal = () => {
+    addDeviceModal.hidden = true;
+    addDeviceError.innerText = '';
+  };
+
+  const openAddDeviceModal = () => {
+    addDeviceForm.reset();
+    document.getElementById('add-device-address').value = 'dynamic';
+    document.getElementById('add-device-compression').value = 'metadata';
+    addDeviceError.innerText = '';
+    addDeviceSubmit.disabled = false;
+    addDeviceSubmit.innerText = 'Add and connect';
+    renderPendingDevices();
+    renderDeviceFolderOptions();
+    addDeviceModal.hidden = false;
+    window.setTimeout(() => addDeviceId.focus(), 0);
   };
 
   document.getElementById('add-folder-btn')?.addEventListener('click', () => {
@@ -873,8 +1235,18 @@ document.addEventListener('DOMContentLoaded', () => {
   addFolderModal?.addEventListener('click', event => {
     if (event.target === addFolderModal) closeAddFolderModal();
   });
+
+  document.getElementById('add-device-btn')?.addEventListener('click', openAddDeviceModal);
+  document.getElementById('device-empty-add')?.addEventListener('click', openAddDeviceModal);
+  document.getElementById('add-device-close')?.addEventListener('click', closeAddDeviceModal);
+  document.getElementById('add-device-cancel')?.addEventListener('click', closeAddDeviceModal);
+  addDeviceModal?.addEventListener('click', event => {
+    if (event.target === addDeviceModal) closeAddDeviceModal();
+  });
+
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape' && !addFolderModal.hidden) closeAddFolderModal();
+    if (event.key === 'Escape' && !addDeviceModal.hidden) closeAddDeviceModal();
   });
 
   addFolderLabel?.addEventListener('input', () => {
@@ -926,6 +1298,80 @@ document.addEventListener('DOMContentLoaded', () => {
     addFolderSubmit.innerText = 'Create folder';
   });
 
+  addDeviceId?.addEventListener('input', () => {
+    const normalized = normalizeDeviceID(addDeviceId.value);
+    if (isValidDeviceID(normalized)) addDeviceId.value = normalized;
+    addDeviceError.innerText = '';
+  });
+  addDeviceId?.addEventListener('blur', () => {
+    addDeviceId.value = normalizeDeviceID(addDeviceId.value);
+  });
+
+  addDeviceForm?.addEventListener('submit', async event => {
+    event.preventDefault();
+    const deviceID = normalizeDeviceID(addDeviceId.value);
+    if (!isValidDeviceID(deviceID)) {
+      addDeviceError.innerText = 'Enter a valid Syncthing Device ID with eight groups of seven characters.';
+      addDeviceId.focus();
+      return;
+    }
+    if (deviceID === localDeviceId) {
+      addDeviceError.innerText = 'That is this device’s ID. Enter the ID shown on the other device.';
+      return;
+    }
+    if (devicesViewData.some(item => item.device.deviceID === deviceID)) {
+      addDeviceError.innerText = 'This device is already configured.';
+      return;
+    }
+
+    addDeviceSubmit.disabled = true;
+    addDeviceSubmit.innerText = 'Adding device…';
+    addDeviceError.innerText = '';
+    const defaults = await fetchAPI('/config/defaults/device') || {};
+    const addresses = document.getElementById('add-device-address').value
+      .split(/[\n,]+/)
+      .map(address => address.trim())
+      .filter(Boolean);
+    const result = await postJSON('/config/devices', {
+      ...defaults,
+      deviceID,
+      name: addDeviceName.value.trim() || 'Remote device',
+      addresses: addresses.length ? addresses : ['dynamic'],
+      compression: document.getElementById('add-device-compression').value,
+      autoAcceptFolders: document.getElementById('add-device-auto-accept').checked,
+      introducer: document.getElementById('add-device-introducer').checked,
+      paused: false
+    });
+
+    if (!result.ok) {
+      addDeviceError.innerText = result.error || 'Could not add this device.';
+      addDeviceSubmit.disabled = false;
+      addDeviceSubmit.innerText = 'Add and connect';
+      return;
+    }
+
+    const selectedFolderIds = [...document.querySelectorAll('input[name="device-folder"]:checked')]
+      .map(input => input.value);
+    const sharingResults = await Promise.all(selectedFolderIds.map(folderId => {
+      const folder = deviceFoldersSnapshot.find(item => item.id === folderId);
+      const folderDevices = Array.isArray(folder?.devices) ? folder.devices : [];
+      if (!folder || folderDevices.some(reference => reference.deviceID === deviceID)) return Promise.resolve({ ok: true });
+      return requestJSON(`/config/folders/${encodeURIComponent(folderId)}`, 'PATCH', {
+        devices: [...folderDevices, { deviceID }]
+      });
+    }));
+
+    selectedDeviceId = deviceID;
+    closeAddDeviceModal();
+    await loadDevices();
+    const sharingFailures = sharingResults.filter(item => !item.ok).length;
+    if (sharingFailures > 0) {
+      window.alert(`Device added, but ${sharingFailures} folder ${sharingFailures === 1 ? 'share' : 'shares'} could not be saved. You can retry from the Folders page.`);
+    }
+    addDeviceSubmit.disabled = false;
+    addDeviceSubmit.innerText = 'Add and connect';
+  });
+
   document.querySelectorAll('[data-folder-filter]').forEach(button => {
     button.addEventListener('click', () => {
       activeFolderFilter = button.dataset.folderFilter;
@@ -943,6 +1389,72 @@ document.addEventListener('DOMContentLoaded', () => {
     folderSearchTerm = event.target.value;
     renderFolderList();
     renderFolderDetail();
+  });
+
+  document.querySelectorAll('[data-device-filter]').forEach(button => {
+    button.addEventListener('click', () => {
+      activeDeviceFilter = button.dataset.deviceFilter;
+      document.querySelectorAll('[data-device-filter]').forEach(filterButton => {
+        const isActive = filterButton === button;
+        filterButton.classList.toggle('active', isActive);
+        filterButton.setAttribute('aria-selected', String(isActive));
+      });
+      renderDeviceList();
+      renderDeviceDetail();
+    });
+  });
+
+  document.getElementById('device-search-input')?.addEventListener('input', event => {
+    deviceSearchTerm = event.target.value;
+    renderDeviceList();
+    renderDeviceDetail();
+  });
+
+  document.getElementById('copy-local-device-id')?.addEventListener('click', async event => {
+    if (!localDeviceId) return;
+    const button = event.currentTarget;
+    const originalLabel = button.innerText;
+    try {
+      await navigator.clipboard.writeText(localDeviceId);
+      button.innerText = 'Copied';
+    } catch (error) {
+      console.error('Could not copy local device ID:', error);
+      button.innerText = 'Copy failed';
+    }
+    window.setTimeout(() => { button.innerText = originalLabel; }, 1500);
+  });
+
+  document.getElementById('device-pause-btn')?.addEventListener('click', async event => {
+    const selected = devicesViewData.find(item => item.device.deviceID === selectedDeviceId);
+    if (!selected) return;
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.innerText = selected.device.paused ? 'Resuming…' : 'Pausing…';
+    const result = await requestJSON(`/config/devices/${encodeURIComponent(selected.device.deviceID)}`, 'PATCH', {
+      paused: !selected.device.paused
+    });
+    if (!result.ok) window.alert(result.error || 'Could not update this device.');
+    await loadDevices();
+    button.disabled = false;
+  });
+
+  document.getElementById('device-remove-btn')?.addEventListener('click', async event => {
+    const selected = devicesViewData.find(item => item.device.deviceID === selectedDeviceId);
+    if (!selected) return;
+    const confirmed = window.confirm(`Remove “${selected.name}” from Syncthing? It will no longer connect or sync shared folders.`);
+    if (!confirmed) return;
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.innerText = 'Removing…';
+    const result = await requestJSON(`/config/devices/${encodeURIComponent(selected.device.deviceID)}`, 'DELETE');
+    if (result.ok) {
+      selectedDeviceId = null;
+      await loadDevices();
+    } else {
+      window.alert(result.error || 'Could not remove this device.');
+    }
+    button.disabled = false;
+    button.innerText = 'Remove';
   });
 
   document.getElementById('folder-rescan-btn')?.addEventListener('click', async event => {

@@ -217,13 +217,149 @@
     </div>
 
     <!-- Devices View -->
-    <div id="view-devices" class="view-content placeholder-view" style="justify-content: flex-start; align-items: stretch; background: transparent; padding: 0;">
-      <div class="page-header">
-        <div class="title-section"><h1>Connected Devices</h1></div>
-        <div class="action-section"><button class="create-btn">Add Device</button></div>
+    <div id="view-devices" class="view-content">
+      <div class="page-header devices-page-header">
+        <div class="devices-heading-copy">
+          <span class="devices-eyebrow">Device network</span>
+          <h1>Devices</h1>
+          <p>Pair computers and phones, monitor live connections, and control what they can access.</p>
+        </div>
+        <button class="devices-add-button" id="add-device-btn">
+          <span aria-hidden="true">+</span>Add device
+        </button>
       </div>
-      <div class="grid-layout" id="devices-grid">
-        <!-- Rendered via JS -->
+
+      <section class="devices-summary-grid" aria-label="Device summary">
+        <article class="card device-summary-card featured">
+          <span class="device-summary-label">Remote devices</span>
+          <strong id="devices-summary-total">0</strong>
+          <small id="devices-summary-connection-copy">No devices configured</small>
+        </article>
+        <article class="card device-summary-card">
+          <span class="device-summary-label"><i class="device-summary-dot online"></i>Online now</span>
+          <strong id="devices-summary-online">0</strong>
+          <small>Actively connected</small>
+        </article>
+        <article class="card device-summary-card">
+          <span class="device-summary-label">Shared folders</span>
+          <strong id="devices-summary-folders">0</strong>
+          <small>Available to other devices</small>
+        </article>
+        <article class="card device-summary-card">
+          <span class="device-summary-label">Session traffic</span>
+          <strong id="devices-summary-traffic">0 B</strong>
+          <small>Sent and received</small>
+        </article>
+      </section>
+
+      <section class="card local-device-card" aria-labelledby="local-device-title">
+        <div class="local-device-identity">
+          <div class="local-device-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"></rect><path d="M9 17h6"></path></svg>
+          </div>
+          <div>
+            <span class="local-device-kicker">This device</span>
+            <h2 id="local-device-title">Local Syncthing</h2>
+            <span class="local-device-state"><i></i>Ready to pair</span>
+          </div>
+        </div>
+        <div class="local-device-id-block">
+          <span>Your Device ID</span>
+          <div><code id="local-device-id">Loading device ID…</code><button type="button" id="copy-local-device-id">Copy</button></div>
+          <small>Share this ID with the other device. Device IDs are public identifiers, not passwords.</small>
+        </div>
+        <ol class="pairing-steps" aria-label="How to connect a device">
+          <li><span>1</span><p><b>Exchange IDs</b><small>Copy your ID and ask for theirs.</small></p></li>
+          <li><span>2</span><p><b>Add both sides</b><small>Each device must approve the other.</small></p></li>
+          <li><span>3</span><p><b>Share folders</b><small>Choose the data this device can sync.</small></p></li>
+        </ol>
+      </section>
+
+      <section class="devices-toolbar" aria-label="Device controls">
+        <div class="devices-filter-tabs" role="tablist" aria-label="Filter devices by connection status">
+          <button class="device-filter active" data-device-filter="all" role="tab" aria-selected="true">All <span id="device-filter-all-count">0</span></button>
+          <button class="device-filter" data-device-filter="online" role="tab" aria-selected="false">Online <span id="device-filter-online-count">0</span></button>
+          <button class="device-filter" data-device-filter="offline" role="tab" aria-selected="false">Offline <span id="device-filter-offline-count">0</span></button>
+          <button class="device-filter" data-device-filter="paused" role="tab" aria-selected="false">Paused <span id="device-filter-paused-count">0</span></button>
+        </div>
+        <label class="devices-search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+          <input type="search" id="device-search-input" placeholder="Search by name, ID, or address" autocomplete="off">
+        </label>
+      </section>
+
+      <div class="devices-workspace">
+        <aside class="card devices-list-panel" aria-label="Remote devices">
+          <div class="devices-panel-heading">
+            <div><span>Your devices</span><small id="devices-visible-count">Loading devices…</small></div>
+            <span class="devices-refresh-indicator"><i></i>Live</span>
+          </div>
+          <div class="devices-list" id="devices-list">
+            <div class="device-list-empty">Loading connection data…</div>
+          </div>
+        </aside>
+
+        <section class="card device-detail-panel" id="device-detail-panel" aria-live="polite">
+          <div class="device-detail-empty" id="device-detail-empty">
+            <div class="device-empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"></rect><path d="M9 17h6"></path></svg>
+            </div>
+            <h2>No remote device selected</h2>
+            <p>Add a device to start syncing, or choose one from the list to inspect its connection.</p>
+            <button type="button" id="device-empty-add">Add your first device</button>
+          </div>
+
+          <div class="device-detail-content" id="device-detail-content" hidden>
+            <div class="device-detail-header">
+              <div class="device-detail-identity">
+                <span class="device-detail-avatar" id="device-detail-avatar">RD</span>
+                <div>
+                  <span class="device-detail-kicker">Remote device</span>
+                  <div class="device-detail-title-row">
+                    <h2 id="device-detail-name">Remote device</h2>
+                    <span class="device-state-badge offline" id="device-detail-status"><i></i>Offline</span>
+                  </div>
+                  <code id="device-detail-id">—</code>
+                </div>
+              </div>
+              <div class="device-detail-actions">
+                <button type="button" class="device-secondary-action" id="device-pause-btn">Pause device</button>
+                <button type="button" class="device-danger-action" id="device-remove-btn">Remove</button>
+              </div>
+            </div>
+
+            <div class="device-connection-banner offline" id="device-connection-banner">
+              <div><i></i><span><b id="device-connection-title">Waiting for connection</b><small id="device-connection-copy">Syncthing will connect automatically when both devices approve each other.</small></span></div>
+              <span id="device-last-seen">Never seen</span>
+            </div>
+
+            <div class="device-detail-stats">
+              <div><span>Received</span><strong id="device-bytes-received">0 B</strong><small>This session</small></div>
+              <div><span>Sent</span><strong id="device-bytes-sent">0 B</strong><small>This session</small></div>
+              <div><span>Shared folders</span><strong id="device-shared-count">0</strong><small id="device-shared-copy">No folders shared</small></div>
+              <div><span>Connection</span><strong id="device-connection-type">—</strong><small id="device-connection-location">No active route</small></div>
+            </div>
+
+            <div class="device-detail-lower-grid">
+              <div class="device-information-block">
+                <div class="device-section-heading"><span>Connection details</span></div>
+                <dl class="device-information-list">
+                  <div><dt>Address</dt><dd id="device-address">Dynamic</dd></div>
+                  <div><dt>Client</dt><dd id="device-client-version">Unknown</dd></div>
+                  <div><dt>Compression</dt><dd id="device-compression">Metadata only</dd></div>
+                  <div><dt>Introducer</dt><dd id="device-introducer">No</dd></div>
+                  <div><dt>Auto-accept folders</dt><dd id="device-auto-accept">Off</dd></div>
+                </dl>
+              </div>
+              <div class="device-shared-block">
+                <div class="device-section-heading"><span>Folders shared with this device</span><small id="device-folder-count">0 folders</small></div>
+                <div class="device-folder-list" id="device-folder-list">
+                  <div class="device-no-folders">No folders are shared with this device.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -449,6 +585,84 @@
           <div class="folder-modal-actions">
             <button type="button" class="folder-modal-cancel" id="add-folder-cancel">Cancel</button>
             <button type="submit" class="folder-modal-submit" id="add-folder-submit">Create folder</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <div class="device-modal-backdrop" id="add-device-modal" hidden>
+      <section class="device-modal" role="dialog" aria-modal="true" aria-labelledby="add-device-title">
+        <div class="device-modal-header">
+          <div>
+            <span class="devices-eyebrow">Secure pairing</span>
+            <h2 id="add-device-title">Add a remote device</h2>
+            <p>Enter the Device ID shown by Syncthing on the other computer or phone.</p>
+          </div>
+          <button type="button" class="device-modal-close" id="add-device-close" aria-label="Close">×</button>
+        </div>
+
+        <div class="pending-devices" id="pending-devices" hidden>
+          <div class="pending-devices-heading">
+            <span>Nearby devices requesting access</span>
+            <small>Select one to fill the form</small>
+          </div>
+          <div class="pending-device-list" id="pending-device-list"></div>
+        </div>
+
+        <form id="add-device-form">
+          <label class="device-form-field device-id-field">
+            <span>Remote Device ID</span>
+            <textarea id="add-device-id" rows="2" placeholder="AAAAAAA-BBBBBBB-CCCCCCC-DDDDDDD-EEEEEEE-FFFFFFF-GGGGGGG-HHHHHHH" spellcheck="false" autocomplete="off" required></textarea>
+            <small>Find this under Actions → Show ID on the other device.</small>
+          </label>
+          <div class="device-form-grid">
+            <label class="device-form-field">
+              <span>Device name</span>
+              <input type="text" id="add-device-name" placeholder="Office laptop" autocomplete="off">
+            </label>
+            <label class="device-form-field">
+              <span>Connection address</span>
+              <input type="text" id="add-device-address" value="dynamic" placeholder="dynamic or tcp://host:22000" autocomplete="off">
+              <small>Use “dynamic” for automatic discovery.</small>
+            </label>
+          </div>
+          <label class="device-form-field">
+            <span>Compression</span>
+            <select id="add-device-compression">
+              <option value="metadata">Metadata only (recommended)</option>
+              <option value="always">All data</option>
+              <option value="never">Disabled</option>
+            </select>
+          </label>
+
+          <fieldset class="device-folder-picker">
+            <legend>Share folders now</legend>
+            <p>Select folders this device should be allowed to synchronize. You can leave all unchecked and share later.</p>
+            <div class="device-folder-options" id="add-device-folder-options">
+              <div class="device-folder-options-empty">No folders are configured yet.</div>
+            </div>
+          </fieldset>
+
+          <div class="device-form-options">
+            <label class="device-form-toggle">
+              <input type="checkbox" id="add-device-auto-accept">
+              <span><b>Automatically accept new folders</b><small>Future folder invitations from this device will be accepted automatically.</small></span>
+            </label>
+            <label class="device-form-toggle">
+              <input type="checkbox" id="add-device-introducer">
+              <span><b>Use as introducer</b><small>Allow this device to introduce other trusted devices.</small></span>
+            </label>
+          </div>
+
+          <div class="device-pairing-note">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+            <span><b>Both devices must approve the pairing.</b> After saving here, add this device’s ID on the remote device using your ID shown on the Devices page.</span>
+          </div>
+
+          <div class="device-form-error" id="add-device-error" role="alert"></div>
+          <div class="device-modal-actions">
+            <button type="button" class="device-modal-cancel" id="add-device-cancel">Cancel</button>
+            <button type="submit" class="device-modal-submit" id="add-device-submit">Add and connect</button>
           </div>
         </form>
       </section>
