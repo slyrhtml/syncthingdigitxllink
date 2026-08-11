@@ -53,86 +53,162 @@
     <div id="view-dashboard" class="view-content placeholder-view" style="justify-content: flex-start; align-items: stretch; background: transparent; padding: 0;">
       <div class="page-header">
         <div class="title-section"><h1>System Dashboard</h1></div>
+        <div class="dashboard-live-badge"><span></span>Live data</div>
       </div>
-      
-      <!-- System Health Bar -->
-      <div class="card metrics-wide-card" style="margin-bottom: 24px; display: flex; flex-direction: row; gap: 32px; padding: 24px;">
-        <div class="metric"><span class="label">CPU Usage</span><span class="value" id="dash-cpu">0%</span></div>
-        <div class="metric"><span class="label">RAM Usage</span><span class="value" id="dash-ram">0 MB</span></div>
+
+      <!-- Primary sync overview -->
+      <section class="card sync-overview-card" aria-labelledby="sync-overview-title">
+        <div class="sync-overview-header">
+          <div>
+            <span class="sync-eyebrow">Activity overview</span>
+            <h2 id="sync-overview-title">Last 24 hours</h2>
+          </div>
+          <div class="sync-health is-healthy" id="dash-sync-health">
+            <span class="sync-health-dot"></span>
+            <span id="dash-sync-health-text">All systems synced</span>
+          </div>
+        </div>
+
+        <div class="sync-overview-main">
+          <div class="sync-primary-metric">
+            <div class="sync-primary-value-row">
+              <strong id="dash-synced-24h">0</strong>
+              <span>files<br>synced</span>
+            </div>
+            <p id="dash-last-sync">No completed transfers yet</p>
+            <div class="sync-breakdown" aria-label="24 hour sync breakdown">
+              <span><b id="dash-files-updated">0</b> updated</span>
+              <span><b id="dash-files-removed">0</b> removed</span>
+              <span><b id="dash-sync-failures">0</b> failed</span>
+            </div>
+          </div>
+
+          <div class="sync-activity-chart">
+            <div class="sync-chart-heading">
+              <div>
+                <span>Completed file syncs</span>
+                <small>Hourly activity</small>
+              </div>
+              <strong id="dash-activity-total">0</strong>
+            </div>
+            <div class="sync-hourly-bars" id="dash-hourly-bars" aria-label="Completed file syncs by hour"></div>
+            <div class="sync-chart-axis"><span>24 hours ago</span><span>Now</span></div>
+          </div>
+        </div>
+
+        <div class="sync-summary-grid">
+          <div class="sync-summary-stat">
+            <span>Session traffic</span>
+            <strong id="dash-session-traffic">0 B</strong>
+            <small>Uploaded + downloaded</small>
+          </div>
+          <div class="sync-summary-stat">
+            <span>Sync completion</span>
+            <strong id="dash-sync-completion">—</strong>
+            <small>Across shared files</small>
+          </div>
+          <div class="sync-summary-stat">
+            <span>Files remaining</span>
+            <strong id="dash-pending-files">0</strong>
+            <small>Waiting to download</small>
+          </div>
+          <div class="sync-summary-stat">
+            <span>Devices online</span>
+            <strong id="dash-device-availability">0 / 0</strong>
+            <small>Remote devices available</small>
+          </div>
+          <div class="sync-summary-stat">
+            <span>Total files</span>
+            <strong id="dash-total-files">0</strong>
+            <small>Indexed globally</small>
+          </div>
+        </div>
+      </section>
+
+      <!-- Secondary system diagnostics -->
+      <div class="card dashboard-health-card">
+        <div class="dashboard-health-label"><span>System health</span><small>Live diagnostics</small></div>
+        <div class="metric"><span class="label">CPU</span><span class="value" id="dash-cpu">0%</span></div>
+        <div class="metric"><span class="label">Memory</span><span class="value" id="dash-ram">0 MB</span></div>
         <div class="metric"><span class="label">Uptime</span><span class="value" id="dash-uptime">0h 0m</span></div>
-        <div class="metric"><span class="label">Goroutines</span><span class="value" id="dash-goroutines">0</span></div>
+        <div class="metric"><span class="label">Workers</span><span class="value" id="dash-goroutines">0</span></div>
         <div class="metric"><span class="label">Discovery</span><span class="value" id="dash-discovery">Online</span></div>
       </div>
 
-      <div class="dashboard-grid" style="display: grid; grid-template-columns: 2fr 1fr; gap: 24px; margin-bottom: 24px;">
-        
+      <div class="dashboard-grid">
         <!-- Left Column: Network & Storage -->
-        <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div class="dashboard-primary-column">
           <!-- Network Hub -->
-          <div class="card chart-card" style="height: 350px; padding: 24px; display: flex; flex-direction: column;">
-            <div style="display: flex; justify-content: space-between; margin-bottom: 16px;">
-              <h3 style="color: var(--text-grey); font-weight: 500;">Live Network Traffic</h3>
-              <div style="display: flex; gap: 16px;">
-                <span style="font-size: 13px; color: #adff2f;" id="dash-up-total">Up: 0 B</span>
-                <span style="font-size: 13px; color: #f39c12;" id="dash-down-total">Down: 0 B</span>
+          <div class="card dashboard-chart-card">
+            <div class="dashboard-card-heading">
+              <h3>Live Network Traffic</h3>
+              <div class="traffic-totals">
+                <span class="traffic-upload" id="dash-up-total">Up: 0 B</span>
+                <span class="traffic-download" id="dash-down-total">Down: 0 B</span>
               </div>
             </div>
-            <div style="flex: 1; min-height: 0;">
+            <div class="chart-wrap">
               <canvas id="transferChart"></canvas>
             </div>
           </div>
 
           <!-- Storage Footprint -->
-          <div class="card" style="padding: 24px;">
-            <h3 style="color: var(--text-grey); font-weight: 500; margin-bottom: 16px;">Storage Footprint</h3>
-            <div class="timeline" style="margin: 0;">
-              <div class="timeline-labels" style="justify-content: space-between; margin-bottom: 8px;">
+          <div class="card dashboard-storage-card">
+            <div class="dashboard-card-heading storage-heading">
+              <h3>Storage Footprint</h3>
+              <span id="dash-storage-percent">0% available locally</span>
+            </div>
+            <div class="timeline storage-timeline">
+              <div class="timeline-labels storage-labels">
                 <span id="dash-storage-local">Local: 0 B</span>
                 <span id="dash-storage-global">Global: 0 B</span>
               </div>
               <div class="timeline-bar-bg">
-                <div class="timeline-bar green-1" id="dash-storage-bar" style="width: 50%; left: 0;"></div>
+                <div class="timeline-bar green-1" id="dash-storage-bar" style="width: 0; left: 0;"></div>
               </div>
             </div>
           </div>
         </div>
 
         <!-- Right Column: Fleet & Activity -->
-        <div style="display: flex; flex-direction: column; gap: 24px;">
+        <div class="dashboard-side-column">
           <!-- Fleet Summary -->
-          <div class="card" style="padding: 24px;">
-            <h3 style="color: var(--text-grey); font-weight: 500; margin-bottom: 16px;">Fleet Summary</h3>
-            <div style="display: flex; flex-direction: column; gap: 16px;">
-              <div class="fleet-row" style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--text-white); font-size: 14px;">Folders Up to Date</span>
+          <div class="card fleet-card">
+            <div class="dashboard-card-heading"><h3>Fleet Summary</h3></div>
+            <div class="fleet-list">
+              <div class="fleet-row">
+                <span>Folders Up to Date</span>
                 <span class="badge outline" id="fleet-folders-ok">0</span>
               </div>
-              <div class="fleet-row" style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--text-white); font-size: 14px;">Folders Syncing</span>
+              <div class="fleet-row">
+                <span>Folders Syncing</span>
                 <span class="badge expects-badge" id="fleet-folders-sync">0</span>
               </div>
-              <div class="fleet-row" style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--text-white); font-size: 14px;">Folders Error/Paused</span>
+              <div class="fleet-row">
+                <span>Folders Error/Paused</span>
                 <span class="badge dark" id="fleet-folders-err">0</span>
               </div>
-              <hr style="border: none; border-top: 1px solid rgba(255,255,255,0.1);">
-              <div class="fleet-row" style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--text-white); font-size: 14px;">Devices Connected</span>
+              <hr>
+              <div class="fleet-row">
+                <span>Devices Connected</span>
                 <span class="badge outline" id="fleet-devices-ok">0</span>
               </div>
-              <div class="fleet-row" style="display: flex; justify-content: space-between; align-items: center;">
-                <span style="color: var(--text-white); font-size: 14px;">Devices Offline</span>
+              <div class="fleet-row">
+                <span>Devices Offline</span>
                 <span class="badge dark" id="fleet-devices-off">0</span>
               </div>
             </div>
           </div>
 
           <!-- Recent Activity -->
-          <div class="card" style="padding: 24px; flex: 1; display: flex; flex-direction: column;">
-            <h3 style="color: var(--text-grey); font-weight: 500; margin-bottom: 16px;">Recent Activity</h3>
-            <div id="dash-activity-feed" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px;">
+          <div class="card recent-activity-card">
+            <div class="dashboard-card-heading activity-heading">
+              <h3>Recent Activity</h3>
+              <span>Latest first</span>
+            </div>
+            <div id="dash-activity-feed" class="activity-feed" aria-live="polite">
               <!-- JS rendered events -->
-              <span style="color: #666; font-size: 13px;">Waiting for events...</span>
+              <div class="activity-empty">Waiting for sync activity...</div>
             </div>
           </div>
         </div>
@@ -192,196 +268,191 @@
 
     <!-- Folders View -->
     <div id="view-folders" class="view-content active">
-
-    <!-- Header Title -->
-    <div class="page-header">
-      <div class="title-section">
-        <button class="back-btn">←</button>
-        <h1>Folders</h1>
-      </div>
-      <div class="action-section">
-        <button class="filter-icon-btn">≢</button>
-        <button class="create-btn">Add new folder</button>
-      </div>
-    </div>
-
-    <!-- Top Cards Area -->
-    <div class="top-cards">
-      <!-- Left Wide Card -->
-      <div class="card metrics-wide-card">
-        <div class="metrics-row">
-          <div class="metric">
-            <span class="label">Total Folders</span>
-            <span class="value" id="metric-folders-count">0</span>
-          </div>
-          <div class="metric">
-            <span class="label">Total Devices</span>
-            <span class="value" id="metric-devices-count">0</span>
-          </div>
-          <div class="metric">
-            <span class="label">Global State</span>
-            <span class="value" id="metric-global-state"><span class="unit">Loading</span></span>
-          </div>
+      <div class="page-header folders-page-header">
+        <div class="folders-heading-copy">
+          <span class="folders-eyebrow">Sync management</span>
+          <h1>Folders</h1>
+          <p>Monitor shared data, sync progress, and connected devices.</p>
         </div>
-        
-        <div class="timeline">
-          <div class="timeline-labels">
-            <span>Scan 1</span>
-            <span>Scan 2</span>
-            <span>Scan 3</span>
-            <span>Scan 4</span>
-          </div>
-          <div class="timeline-bar-bg">
-            <div class="timeline-bar green-1" style="width: 15%; left: 0;"></div>
-            <div class="timeline-bar green-2" style="width: 25%; left: 20%;"></div>
-            <div class="timeline-bar grey-1" style="width: 45%; left: 50%;"></div>
-          </div>
-          <div class="timeline-avatars">
-            <div class="avatar-group group-1">
-              <img src="https://i.pravatar.cc/100?img=1" class="av"><img src="https://i.pravatar.cc/100?img=2" class="av"><img src="https://i.pravatar.cc/100?img=3" class="av">
+        <button class="folders-add-button" id="add-folder-btn">
+          <span aria-hidden="true">+</span>Add folder
+        </button>
+      </div>
+
+      <section class="folders-summary-grid" aria-label="Folder summary">
+        <article class="card folder-summary-card featured">
+          <span class="folder-summary-label">Total folders</span>
+          <strong id="metric-folders-count">0</strong>
+          <small id="folders-summary-device-count">Across 0 remote devices</small>
+        </article>
+        <article class="card folder-summary-card">
+          <span class="folder-summary-label"><i class="folder-summary-dot healthy"></i>Up to date</span>
+          <strong id="folders-summary-healthy">0</strong>
+          <small>Fully synchronized</small>
+        </article>
+        <article class="card folder-summary-card">
+          <span class="folder-summary-label"><i class="folder-summary-dot syncing"></i>Syncing</span>
+          <strong id="folders-summary-syncing">0</strong>
+          <small>Active or scanning</small>
+        </article>
+        <article class="card folder-summary-card">
+          <span class="folder-summary-label"><i class="folder-summary-dot attention"></i>Needs attention</span>
+          <strong id="folders-summary-attention">0</strong>
+          <small>Paused, offline, or errors</small>
+        </article>
+        <article class="card folder-summary-card">
+          <span class="folder-summary-label">Data managed</span>
+          <strong id="metric-total-data">0 B</strong>
+          <small>Global shared content</small>
+        </article>
+      </section>
+
+      <section class="folders-toolbar" aria-label="Folder controls">
+        <div class="folders-filter-tabs" role="tablist" aria-label="Filter folders by status">
+          <button class="folder-filter active" data-folder-filter="all" role="tab" aria-selected="true">All <span id="folder-filter-all-count">0</span></button>
+          <button class="folder-filter" data-folder-filter="healthy" role="tab" aria-selected="false">Up to date <span id="folder-filter-healthy-count">0</span></button>
+          <button class="folder-filter" data-folder-filter="syncing" role="tab" aria-selected="false">Syncing <span id="folder-filter-syncing-count">0</span></button>
+          <button class="folder-filter" data-folder-filter="attention" role="tab" aria-selected="false">Attention <span id="folder-filter-attention-count">0</span></button>
+        </div>
+        <label class="folders-search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+          <input type="search" id="folder-search-input" placeholder="Search by name, ID, or path" autocomplete="off">
+        </label>
+      </section>
+
+      <div class="folders-workspace">
+        <aside class="card folders-list-panel" aria-label="Folders">
+          <div class="folders-panel-heading">
+            <div>
+              <span>Your folders</span>
+              <small id="folders-visible-count">Loading folders…</small>
             </div>
+            <span class="folders-refresh-indicator"><i></i>Live</span>
           </div>
-        </div>
-      </div>
+          <div class="folders-list" id="folders-list">
+            <div class="folder-list-empty">Loading folder data…</div>
+          </div>
+        </aside>
 
-      <!-- Right Card -->
-      <div class="card payout-card">
-        <button class="expand-btn">↗</button>
-        <div class="payout-header">
-          <span class="label">Total Data Managed</span>
-          <div class="payout-value-row">
-            <span class="value" id="metric-total-data">0 B</span>
-            <span class="badge expects-badge">Synced</span>
-          </div>
-        </div>
-        <div class="payment-methods">
-          <div class="method-box dark">
-            <span class="method-num" id="metric-up-rate">0 B/s</span>
-            <span class="method-name">Upload</span>
-          </div>
-          <div class="method-box active">
-            <span class="method-num" id="metric-down-rate">0 B/s</span>
-            <span class="method-name">Download</span>
-          </div>
-          <div class="method-box dark">
-            <span class="method-num" id="metric-cpu">0%</span>
-            <span class="method-name">CPU</span>
-          </div>
-          <button class="pay-out-btn-white">Pause All</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Middle Filters -->
-    <div class="middle-filters">
-      <div class="left-filters">
-        <span class="filter-label">Active filters <span class="filter-count">2</span></span>
-        <div class="dropdown">All types ⌄</div>
-        <div class="dropdown">All states ⌄</div>
-      </div>
-      <div class="right-filters">
-        <div class="search-input">
-          <input type="text" placeholder="Search folders...">
-          <span>🔍</span>
-        </div>
-      </div>
-    </div>
-
-    <!-- Center Floating Pill -->
-    <div class="center-floating-pill">
-      <button class="pill-btn active">All Folders</button>
-      <button class="pill-btn">Syncing <span class="pill-badge">0</span></button>
-      <button class="pill-btn">Out of Sync <span class="pill-badge dark">0</span></button>
-    </div>
-
-    <!-- Bottom Split View -->
-    <div class="bottom-split">
-      <!-- Left White List -->
-      <div class="list-section">
-        <div class="list-header">
-          <h2>Active Folders</h2>
-          <div class="list-actions">
-            <button>📋</button>
-            <button>⋮</button>
-          </div>
-        </div>
-        <div class="invoice-list" id="folders-list">
-          <div class="invoice-item">
-            <div class="item-id-date">
-              <span class="id">Loading...</span>
+        <section class="card folder-detail-panel" id="folder-detail-panel" aria-live="polite">
+          <div class="folder-detail-empty" id="folder-detail-empty">
+            <div class="folder-empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2H21v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M3 7.5V6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1.5"></path></svg>
             </div>
+            <h2>Select a folder</h2>
+            <p>Choose a folder to view its sync health, storage, and sharing details.</p>
           </div>
-        </div>
-      </div>
 
-      <!-- Right Dark Detail -->
-      <div class="detail-section">
-        <div class="detail-header-row">
-          <div class="invoice-title">
-            <span class="detail-label">Folder details</span>
-            <div class="detail-id-row">
-              <span class="currency">🗂️</span> <h2 id="detail-title">Select a folder</h2>
-              <span class="badge outline" id="detail-status">Unknown</span>
+          <div class="folder-detail-content" id="folder-detail-content" hidden>
+            <div class="folder-detail-header">
+              <div class="folder-detail-identity">
+                <div class="folder-detail-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2H21v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M3 7.5V6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1.5"></path></svg>
+                </div>
+                <div>
+                  <span class="folder-detail-kicker">Folder details</span>
+                  <div class="folder-detail-title-row">
+                    <h2 id="detail-title">Folder</h2>
+                    <span class="folder-state-badge healthy" id="detail-status">Up to date</span>
+                  </div>
+                  <span class="folder-detail-id" id="detail-id">—</span>
+                </div>
+              </div>
+              <button class="folder-rescan-button" id="folder-rescan-btn">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"></path><path d="M19 11a7 7 0 1 0 1 5"></path></svg>
+                Rescan now
+              </button>
             </div>
-          </div>
-          <div class="company-info">
-            <span class="detail-label">Folder ID</span>
-            <div class="company-logo" id="detail-id" style="font-size: 13px;">-</div>
-          </div>
-          <div class="customer-info">
-            <span class="detail-label">Path</span>
-            <div class="customer-profile">
-              <div class="customer-names">
-                <span class="name" id="detail-path">-</span>
+
+            <div class="folder-path-card">
+              <span>Local path</span>
+              <code id="detail-path">—</code>
+            </div>
+
+            <div class="folder-progress-block">
+              <div class="folder-progress-heading">
+                <div><span>Sync completion</span><small id="detail-progress-copy">No data indexed</small></div>
+                <strong id="detail-progress-percent">0%</strong>
+              </div>
+              <div class="folder-progress-track"><span id="detail-progress-bar"></span></div>
+            </div>
+
+            <div class="folder-detail-stats">
+              <div><span>Global size</span><strong id="detail-global-size">0 B</strong></div>
+              <div><span>Local size</span><strong id="detail-local-size">0 B</strong></div>
+              <div><span>Files</span><strong id="detail-files">0</strong></div>
+              <div><span>Directories</span><strong id="detail-dirs">0</strong></div>
+              <div><span>Pending</span><strong id="detail-pending">0</strong></div>
+            </div>
+
+            <div class="folder-detail-lower-grid">
+              <div class="folder-information-block">
+                <div class="folder-section-heading"><span>Configuration</span></div>
+                <dl class="folder-information-list">
+                  <div><dt>Folder type</dt><dd id="detail-folder-type">—</dd></div>
+                  <div><dt>Watch for changes</dt><dd id="detail-watch-state">—</dd></div>
+                  <div><dt>Rescan interval</dt><dd id="detail-rescan-interval">—</dd></div>
+                  <div><dt>Last scanned</dt><dd id="detail-scanned">—</dd></div>
+                  <div><dt>Last file synced</dt><dd id="detail-last-file">—</dd></div>
+                </dl>
+              </div>
+
+              <div class="folder-sharing-block">
+                <div class="folder-section-heading"><span>Shared with</span><small id="detail-device-count">0 devices</small></div>
+                <div class="folder-device-list" id="detail-device-list">
+                  <div class="folder-no-devices">Not shared with another device</div>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-
-        <div class="services-grid">
-          <div class="service-box">
-            <div class="service-top">
-              <span class="amount" id="detail-global-size">0 B</span> ↗
-            </div>
-            <span class="service-name">Global Size</span>
-          </div>
-          <div class="service-box">
-            <div class="service-top">
-              <span class="amount" id="detail-local-size">0 B</span> ↗
-            </div>
-            <span class="service-name">Local Size</span>
-          </div>
-          <div class="service-box">
-            <div class="service-top">
-              <span class="amount" id="detail-files">0</span> ↗
-            </div>
-            <span class="service-name">Files</span>
-          </div>
-          <div class="service-box add-box">
-            <span class="plus">+</span>
-          </div>
-        </div>
-
-        <div class="detail-footer">
-          <div class="totals-row">
-            <div class="total-col">
-              <span class="detail-label">Directories</span>
-              <span class="total-val" id="detail-dirs">0</span>
-            </div>
-            <div class="total-col">
-              <span class="detail-label">Last Scanned</span>
-              <span class="total-val" id="detail-scanned" style="font-size: 14px;">-</span>
-            </div>
-          </div>
-          <div class="footer-actions">
-            <button class="icon-btn-round">🔗</button>
-            <button class="icon-btn-round">⚙️</button>
-            <button class="pay-out-btn-green">Force Rescan</button>
-          </div>
-        </div>
-    </div> <!-- End Detail Section -->
-    </div> <!-- End Bottom Split -->
+        </section>
+      </div>
     </div> <!-- End view-folders -->
+
+    <div class="folder-modal-backdrop" id="add-folder-modal" hidden>
+      <section class="folder-modal" role="dialog" aria-modal="true" aria-labelledby="add-folder-title">
+        <div class="folder-modal-header">
+          <div>
+            <span class="folders-eyebrow">New share</span>
+            <h2 id="add-folder-title">Add a folder</h2>
+            <p>Choose a local path to begin indexing and sharing.</p>
+          </div>
+          <button type="button" class="folder-modal-close" id="add-folder-close" aria-label="Close">×</button>
+        </div>
+        <form id="add-folder-form">
+          <label class="folder-form-field">
+            <span>Folder name</span>
+            <input type="text" id="add-folder-label" placeholder="Creative Projects" autocomplete="off">
+          </label>
+          <label class="folder-form-field">
+            <span>Folder ID</span>
+            <input type="text" id="add-folder-id" placeholder="creative-projects" pattern="[A-Za-z0-9._-]+" required autocomplete="off">
+            <small>Used to identify this folder across devices.</small>
+          </label>
+          <label class="folder-form-field">
+            <span>Local path</span>
+            <input type="text" id="add-folder-path" placeholder="/Users/you/Projects" required autocomplete="off">
+          </label>
+          <label class="folder-form-field">
+            <span>Folder type</span>
+            <select id="add-folder-type">
+              <option value="sendreceive">Send &amp; Receive</option>
+              <option value="sendonly">Send Only</option>
+              <option value="receiveonly">Receive Only</option>
+            </select>
+          </label>
+          <label class="folder-form-toggle">
+            <input type="checkbox" id="add-folder-watch" checked>
+            <span><b>Watch for changes</b><small>Sync new changes without waiting for the next scheduled scan.</small></span>
+          </label>
+          <div class="folder-form-error" id="add-folder-error" role="alert"></div>
+          <div class="folder-modal-actions">
+            <button type="button" class="folder-modal-cancel" id="add-folder-cancel">Cancel</button>
+            <button type="submit" class="folder-modal-submit" id="add-folder-submit">Create folder</button>
+          </div>
+        </form>
+      </section>
+    </div>
   </div> <!-- End app-container -->
   <script src="app.js"></script>
 </body>
