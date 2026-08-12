@@ -3,11 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Salesforce Invoices</title>
+  <title>Syncthing Desktop</title>
   <link rel="stylesheet" href="index.css">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
   <div class="app-container">
@@ -15,19 +16,19 @@
     <!-- Top Navigation -->
     <header class="top-nav">
       <div class="logo">
-        <svg viewBox="0 0 24 24" fill="white" width="24" height="24"><path d="M12 2L14.4 9.6H22L15.8 14.4L18.2 22L12 17.2L5.8 22L8.2 14.4L2 9.6H9.6L12 2Z"/></svg>
-        <span>salesforce</span>
+        <svg viewBox="0 0 24 24" fill="white" width="24" height="24"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+        <span>syncthing</span>
       </div>
       
       <div class="center-nav">
         <div class="grid-icon">80</div>
         <div class="nav-pill-container">
           <button class="nav-icon-btn"><svg viewBox="0 0 24 24" width="16" height="16" fill="white"><rect x="3" y="5" width="18" height="14" rx="2"/></svg></button>
-          <button class="nav-item">Estimates</button>
-          <button class="nav-item active"><span class="dot"></span> Invoices</button>
-          <button class="nav-item">Payments</button>
-          <button class="nav-item">Recurring invoices</button>
-          <button class="nav-item">Checkouts</button>
+          <button class="nav-item" data-target="view-dashboard">Dashboard</button>
+          <button class="nav-item active" data-target="view-folders"><span class="dot"></span> Folders</button>
+          <button class="nav-item" data-target="view-devices">Devices</button>
+          <button class="nav-item" data-target="view-settings">Settings</button>
+          <button class="nav-item" data-target="view-advanced">Advanced</button>
         </div>
       </div>
 
@@ -48,248 +49,1006 @@
       </div>
     </header>
 
-    <!-- Header Title -->
-    <div class="page-header">
-      <div class="title-section">
-        <button class="back-btn">←</button>
-        <h1>Invoices</h1>
-      </div>
-      <div class="action-section">
-        <button class="filter-icon-btn">≢</button>
-        <button class="create-btn">Create an invoice</button>
-      </div>
-    </div>
-
-    <!-- Top Cards Area -->
-    <div class="top-cards">
-      <!-- Left Wide Card -->
-      <div class="card metrics-wide-card">
-        <div class="metrics-row">
-          <div class="metric">
-            <span class="label">Overdue</span>
-            <span class="value"><span class="currency">$</span>31,211.00</span>
-          </div>
-          <div class="metric">
-            <span class="label">Due within next month</span>
-            <span class="value"><span class="currency">$</span>172,560.00</span>
-          </div>
-          <div class="metric">
-            <span class="label">Average time to get paid</span>
-            <span class="value">12 <span class="unit">days</span></span>
-          </div>
-        </div>
-        
-        <div class="timeline">
-          <div class="timeline-labels">
-            <span>Sep</span>
-            <span>Oct</span>
-            <span>Nov</span>
-            <span>Dec</span>
-          </div>
-          <div class="timeline-bar-bg">
-            <div class="timeline-bar green-1" style="width: 15%; left: 0;"></div>
-            <div class="timeline-bar green-2" style="width: 25%; left: 20%;"></div>
-            <div class="timeline-bar grey-1" style="width: 45%; left: 50%;"></div>
-          </div>
-          <div class="timeline-avatars">
-            <div class="avatar-group group-1">
-              <img src="https://i.pravatar.cc/100?img=1" class="av"><img src="https://i.pravatar.cc/100?img=2" class="av"><img src="https://i.pravatar.cc/100?img=3" class="av"><img src="https://i.pravatar.cc/100?img=4" class="av"><img src="https://i.pravatar.cc/100?img=5" class="av">
-            </div>
-            <div class="avatar-group group-2" style="margin-left: 100px;">
-              <img src="https://i.pravatar.cc/100?img=6" class="av"><img src="https://i.pravatar.cc/100?img=7" class="av"><img src="https://i.pravatar.cc/100?img=8" class="av">
-            </div>
-            <div class="avatar-group group-3" style="margin-left: 120px;">
-              <img src="https://i.pravatar.cc/100?img=9" class="av"><img src="https://i.pravatar.cc/100?img=10" class="av">
-            </div>
-          </div>
-        </div>
+    <!-- Dashboard View -->
+    <div id="view-dashboard" class="view-content placeholder-view" style="justify-content: flex-start; align-items: stretch; background: transparent; padding: 0;">
+      <div class="page-header">
+        <div class="title-section"><h1>System Dashboard</h1></div>
+        <div class="dashboard-live-badge"><span></span>Live data</div>
       </div>
 
-      <!-- Right Card -->
-      <div class="card payout-card">
-        <button class="expand-btn">↗</button>
-        <div class="payout-header">
-          <span class="label">Available for Instant Payout</span>
-          <div class="payout-value-row">
-            <span class="value"><span class="currency">$</span>214,390.00</span>
-            <span class="badge expects-badge">Expects</span>
+      <!-- Primary sync overview -->
+      <section class="card sync-overview-card" aria-labelledby="sync-overview-title">
+        <div class="sync-overview-header">
+          <div>
+            <span class="sync-eyebrow">Activity overview</span>
+            <h2 id="sync-overview-title">Last 24 hours</h2>
+          </div>
+          <div class="sync-health is-healthy" id="dash-sync-health">
+            <span class="sync-health-dot"></span>
+            <span id="dash-sync-health-text">All systems synced</span>
           </div>
         </div>
-        <div class="payment-methods">
-          <div class="method-box dark">
-            <span class="method-num">*4443</span>
-            <span class="method-name">Visa</span>
-          </div>
-          <div class="method-box active">
-            <span class="method-num">#177210</span>
-            <span class="method-name">Stripe</span>
-          </div>
-          <div class="method-box dark">
-            <span class="method-num">#711221</span>
-            <span class="method-name">PayPal</span>
-          </div>
-          <button class="pay-out-btn-white">Pay out now</button>
-        </div>
-      </div>
-    </div>
 
-    <!-- Middle Filters -->
-    <div class="middle-filters">
-      <div class="left-filters">
-        <span class="filter-label">Active filters <span class="filter-count">2</span></span>
-        <div class="dropdown">All customers ⌄</div>
-        <div class="dropdown">All statuses ⌄</div>
-      </div>
-      <div class="right-filters">
-        <div class="date-picker">November 2023 📅</div>
-        <div class="date-picker">December 2023 📅</div>
-        <div class="search-input">
-          <input type="text" placeholder="Enter invoice #">
-          <span>🔍</span>
-        </div>
-      </div>
-    </div>
+        <div class="sync-overview-main">
+          <div class="sync-primary-metric">
+            <div class="sync-primary-value-row">
+              <strong id="dash-synced-24h">0</strong>
+              <span>files<br>synced</span>
+            </div>
+            <p id="dash-last-sync">No completed transfers yet</p>
+            <div class="sync-breakdown" aria-label="24 hour sync breakdown">
+              <span><b id="dash-files-updated">0</b> updated</span>
+              <span><b id="dash-files-removed">0</b> removed</span>
+              <span><b id="dash-sync-failures">0</b> failed</span>
+            </div>
+          </div>
 
-    <!-- Center Floating Pill -->
-    <div class="center-floating-pill">
-      <button class="pill-btn">All Invoices</button>
-      <button class="pill-btn">Draft <span class="pill-badge">3</span></button>
-      <button class="pill-btn active">Unpaid <span class="pill-badge dark">5</span></button>
-    </div>
+          <div class="sync-activity-chart">
+            <div class="sync-chart-heading">
+              <div>
+                <span>Completed file syncs</span>
+                <small>Hourly activity</small>
+              </div>
+              <strong id="dash-activity-total">0</strong>
+            </div>
+            <div class="sync-hourly-bars" id="dash-hourly-bars" aria-label="Completed file syncs by hour"></div>
+            <div class="sync-chart-axis"><span>24 hours ago</span><span>Now</span></div>
+          </div>
+        </div>
 
-    <!-- Bottom Split View -->
-    <div class="bottom-split">
-      <!-- Left White List -->
-      <div class="list-section">
-        <div class="list-header">
-          <h2>Unpaid Invoices</h2>
-          <div class="list-actions">
-            <button>📋</button>
-            <button>⋮</button>
+        <div class="sync-summary-grid">
+          <div class="sync-summary-stat">
+            <span>Session traffic</span>
+            <strong id="dash-session-traffic">0 B</strong>
+            <small>Uploaded + downloaded</small>
+          </div>
+          <div class="sync-summary-stat">
+            <span>Sync completion</span>
+            <strong id="dash-sync-completion">—</strong>
+            <small>Across shared files</small>
+          </div>
+          <div class="sync-summary-stat">
+            <span>Files remaining</span>
+            <strong id="dash-pending-files">0</strong>
+            <small>Waiting to download</small>
+          </div>
+          <div class="sync-summary-stat">
+            <span>Devices online</span>
+            <strong id="dash-device-availability">0 / 0</strong>
+            <small>Remote devices available</small>
+          </div>
+          <div class="sync-summary-stat">
+            <span>Total files</span>
+            <strong id="dash-total-files">0</strong>
+            <small>Indexed globally</small>
           </div>
         </div>
-        <div class="invoice-list">
-          <div class="invoice-item">
-            <img src="https://i.pravatar.cc/100?img=12" class="item-av">
-            <div class="item-id-date">
-              <span class="id"># 404-002</span>
-              <span class="date">In 2 days</span>
-            </div>
-            <span class="status unsent">Unsent</span>
-            <span class="amount">$80,770.00</span>
-          </div>
-          <div class="invoice-item">
-            <img src="https://i.pravatar.cc/100?img=13" class="item-av">
-            <div class="item-id-date">
-              <span class="id"># 426-001</span>
-              <span class="date">In 4 days</span>
-            </div>
-            <span class="status viewed">Viewed</span>
-            <span class="amount">$27,114.00</span>
-          </div>
-          <div class="invoice-item active">
-            <img src="https://i.pravatar.cc/100?img=14" class="item-av">
-            <div class="item-id-date">
-              <span class="id"># 427-012</span>
-              <span class="date">In 5 days</span>
-            </div>
-            <span class="status unsent-white">Unsent</span>
-            <span class="amount">$53,154.00</span>
-          </div>
-          <div class="invoice-item">
-            <img src="https://i.pravatar.cc/100?img=15" class="item-av">
-            <div class="item-id-date">
-              <span class="id"># 424-112</span>
-              <span class="date">In 16 days</span>
-            </div>
-            <span class="status viewed">Viewed</span>
-            <span class="amount">$61,223.00</span>
-          </div>
-          <div class="invoice-item">
-            <img src="https://i.pravatar.cc/100?img=16" class="item-av">
-            <div class="item-id-date">
-              <span class="id"># 417-020</span>
-              <span class="date">In 19 days</span>
-            </div>
-            <span class="status viewed">Viewed</span>
-            <span class="amount">$7,311.00</span>
-          </div>
-        </div>
+      </section>
+
+      <!-- Secondary system diagnostics -->
+      <div class="card dashboard-health-card">
+        <div class="dashboard-health-label"><span>System health</span><small>Live diagnostics</small></div>
+        <div class="metric"><span class="label">CPU</span><span class="value" id="dash-cpu">0%</span></div>
+        <div class="metric"><span class="label">Memory</span><span class="value" id="dash-ram">0 MB</span></div>
+        <div class="metric"><span class="label">Uptime</span><span class="value" id="dash-uptime">0h 0m</span></div>
+        <div class="metric"><span class="label">Workers</span><span class="value" id="dash-goroutines">0</span></div>
+        <div class="metric"><span class="label">Discovery</span><span class="value" id="dash-discovery">Online</span></div>
       </div>
 
-      <!-- Right Dark Detail -->
-      <div class="detail-section">
-        <div class="detail-header-row">
-          <div class="invoice-title">
-            <span class="detail-label">Invoice details</span>
-            <div class="detail-id-row">
-              <span class="currency">#</span> <h2>427-012</h2>
-              <span class="badge outline">Unsent</span>
+      <div class="dashboard-grid">
+        <!-- Left Column: Network & Storage -->
+        <div class="dashboard-primary-column">
+          <!-- Network Hub -->
+          <div class="card dashboard-chart-card">
+            <div class="dashboard-card-heading">
+              <h3>Live Network Traffic</h3>
+              <div class="traffic-totals">
+                <span class="traffic-upload" id="dash-up-total">Up: 0 B</span>
+                <span class="traffic-download" id="dash-down-total">Down: 0 B</span>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <canvas id="transferChart"></canvas>
             </div>
           </div>
-          <div class="company-info">
-            <span class="detail-label">Company</span>
-            <div class="company-logo">BlueRock ❖</div>
-          </div>
-          <div class="customer-info">
-            <span class="detail-label">Customer</span>
-            <div class="customer-profile">
-              <img src="https://i.pravatar.cc/100?img=14" class="item-av">
-              <div class="customer-names">
-                <span class="name">Maria Jones</span>
-                <span class="role">CEO BlueRock Pvt Ltd.</span>
+
+          <!-- Storage Footprint -->
+          <div class="card dashboard-storage-card">
+            <div class="dashboard-card-heading storage-heading">
+              <h3>Storage Footprint</h3>
+              <span id="dash-storage-percent">0% available locally</span>
+            </div>
+            <div class="timeline storage-timeline">
+              <div class="timeline-labels storage-labels">
+                <span id="dash-storage-local">Local: 0 B</span>
+                <span id="dash-storage-global">Global: 0 B</span>
+              </div>
+              <div class="timeline-bar-bg">
+                <div class="timeline-bar green-1" id="dash-storage-bar" style="width: 0; left: 0;"></div>
               </div>
             </div>
           </div>
         </div>
 
-        <div class="services-grid">
-          <div class="service-box">
-            <div class="service-top">
-              <span class="currency">$</span><span class="amount">10,630.80</span> ↗
+        <!-- Right Column: Fleet & Activity -->
+        <div class="dashboard-side-column">
+          <!-- Fleet Summary -->
+          <div class="card fleet-card">
+            <div class="dashboard-card-heading"><h3>Fleet Summary</h3></div>
+            <div class="fleet-list">
+              <div class="fleet-row">
+                <span>Folders Up to Date</span>
+                <span class="badge outline" id="fleet-folders-ok">0</span>
+              </div>
+              <div class="fleet-row">
+                <span>Folders Syncing</span>
+                <span class="badge expects-badge" id="fleet-folders-sync">0</span>
+              </div>
+              <div class="fleet-row">
+                <span>Folders Error/Paused</span>
+                <span class="badge dark" id="fleet-folders-err">0</span>
+              </div>
+              <hr>
+              <div class="fleet-row">
+                <span>Devices Connected</span>
+                <span class="badge outline" id="fleet-devices-ok">0</span>
+              </div>
+              <div class="fleet-row">
+                <span>Devices Offline</span>
+                <span class="badge dark" id="fleet-devices-off">0</span>
+              </div>
             </div>
-            <span class="service-name">Concept Development</span>
           </div>
-          <div class="service-box">
-            <div class="service-top">
-              <span class="currency">$</span><span class="amount">31,892.40</span> ↗
+
+          <!-- Recent Activity -->
+          <div class="card recent-activity-card">
+            <div class="dashboard-card-heading activity-heading">
+              <h3>Recent Activity</h3>
+              <span>Latest first</span>
             </div>
-            <span class="service-name">CRM Development</span>
-          </div>
-          <div class="service-box">
-            <div class="service-top">
-              <span class="currency">$</span><span class="amount">10,630.80</span> ↗
+            <div id="dash-activity-feed" class="activity-feed" aria-live="polite">
+              <!-- JS rendered events -->
+              <div class="activity-empty">Waiting for sync activity...</div>
             </div>
-            <span class="service-name">CRM Integration</span>
-          </div>
-          <div class="service-box add-box">
-            <span class="plus">+</span>
           </div>
         </div>
 
-        <div class="detail-footer">
-          <div class="totals-row">
-            <div class="total-col">
-              <span class="detail-label">Sub Total</span>
-              <span class="total-val"><span class="currency">$</span>53,154.00</span>
-            </div>
-            <div class="total-col">
-              <span class="detail-label">Total</span>
-              <span class="total-val"><span class="currency">$</span>53,154.00</span>
-            </div>
-            <div class="total-col">
-              <span class="detail-label">Balance Due</span>
-              <span class="total-val"><span class="currency">$</span>53,154.00</span>
-            </div>
-          </div>
-          <div class="footer-actions">
-            <button class="icon-btn-round">🔗</button>
-            <button class="icon-btn-round">📅</button>
-            <button class="pay-out-btn-green">Pay out now</button>
-          </div>
-        </div>
       </div>
     </div>
-  </div>
+
+    <!-- Devices View -->
+    <div id="view-devices" class="view-content">
+      <div class="page-header devices-page-header">
+        <div class="devices-heading-copy">
+          <span class="devices-eyebrow">Device network</span>
+          <h1>Devices</h1>
+          <p>Pair computers and phones, monitor live connections, and control what they can access.</p>
+        </div>
+        <button class="devices-add-button" id="add-device-btn">
+          <span aria-hidden="true">+</span>Add device
+        </button>
+      </div>
+
+      <section class="devices-summary-grid" aria-label="Device summary">
+        <article class="card device-summary-card featured">
+          <span class="device-summary-label">Remote devices</span>
+          <strong id="devices-summary-total">0</strong>
+          <small id="devices-summary-connection-copy">No devices configured</small>
+        </article>
+        <article class="card device-summary-card">
+          <span class="device-summary-label"><i class="device-summary-dot online"></i>Online now</span>
+          <strong id="devices-summary-online">0</strong>
+          <small>Actively connected</small>
+        </article>
+        <article class="card device-summary-card">
+          <span class="device-summary-label">Shared folders</span>
+          <strong id="devices-summary-folders">0</strong>
+          <small>Available to other devices</small>
+        </article>
+        <article class="card device-summary-card">
+          <span class="device-summary-label">Session traffic</span>
+          <strong id="devices-summary-traffic">0 B</strong>
+          <small>Sent and received</small>
+        </article>
+      </section>
+
+      <section class="card local-device-card" aria-labelledby="local-device-title">
+        <div class="local-device-identity">
+          <div class="local-device-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="3"></rect><path d="M9 17h6"></path></svg>
+          </div>
+          <div>
+            <span class="local-device-kicker">This device</span>
+            <h2 id="local-device-title">Local Syncthing</h2>
+            <span class="local-device-state"><i></i>Ready to pair</span>
+          </div>
+        </div>
+        <div class="local-device-id-block">
+          <span>Your Device ID</span>
+          <div><code id="local-device-id">Loading device ID…</code><button type="button" id="copy-local-device-id">Copy</button></div>
+          <small>Share this ID with the other device. Device IDs are public identifiers, not passwords.</small>
+        </div>
+        <ol class="pairing-steps" aria-label="How to connect a device">
+          <li><span>1</span><p><b>Exchange IDs</b><small>Copy your ID and ask for theirs.</small></p></li>
+          <li><span>2</span><p><b>Add both sides</b><small>Each device must approve the other.</small></p></li>
+          <li><span>3</span><p><b>Share folders</b><small>Choose the data this device can sync.</small></p></li>
+        </ol>
+      </section>
+
+      <section class="devices-toolbar" aria-label="Device controls">
+        <div class="devices-filter-tabs" role="tablist" aria-label="Filter devices by connection status">
+          <button class="device-filter active" data-device-filter="all" role="tab" aria-selected="true">All <span id="device-filter-all-count">0</span></button>
+          <button class="device-filter" data-device-filter="online" role="tab" aria-selected="false">Online <span id="device-filter-online-count">0</span></button>
+          <button class="device-filter" data-device-filter="offline" role="tab" aria-selected="false">Offline <span id="device-filter-offline-count">0</span></button>
+          <button class="device-filter" data-device-filter="paused" role="tab" aria-selected="false">Paused <span id="device-filter-paused-count">0</span></button>
+        </div>
+        <label class="devices-search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+          <input type="search" id="device-search-input" placeholder="Search by name, ID, or address" autocomplete="off">
+        </label>
+      </section>
+
+      <div class="devices-workspace">
+        <aside class="card devices-list-panel" aria-label="Remote devices">
+          <div class="devices-panel-heading">
+            <div><span>Your devices</span><small id="devices-visible-count">Loading devices…</small></div>
+            <span class="devices-refresh-indicator"><i></i>Live</span>
+          </div>
+          <div class="devices-list" id="devices-list">
+            <div class="device-list-empty">Loading connection data…</div>
+          </div>
+        </aside>
+
+        <section class="card device-detail-panel" id="device-detail-panel" aria-live="polite">
+          <div class="device-detail-empty" id="device-detail-empty">
+            <div class="device-empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="5" y="3" width="14" height="18" rx="3"></rect><path d="M9 17h6"></path></svg>
+            </div>
+            <h2>No remote device selected</h2>
+            <p>Add a device to start syncing, or choose one from the list to inspect its connection.</p>
+            <button type="button" id="device-empty-add">Add your first device</button>
+          </div>
+
+          <div class="device-detail-content" id="device-detail-content" hidden>
+            <div class="device-detail-header">
+              <div class="device-detail-identity">
+                <span class="device-detail-avatar" id="device-detail-avatar">RD</span>
+                <div>
+                  <span class="device-detail-kicker">Remote device</span>
+                  <div class="device-detail-title-row">
+                    <h2 id="device-detail-name">Remote device</h2>
+                    <span class="device-state-badge offline" id="device-detail-status"><i></i>Offline</span>
+                  </div>
+                  <code id="device-detail-id">—</code>
+                </div>
+              </div>
+              <div class="device-detail-actions">
+                <button type="button" class="device-secondary-action" id="device-pause-btn">Pause device</button>
+                <button type="button" class="device-danger-action" id="device-remove-btn">Remove</button>
+              </div>
+            </div>
+
+            <div class="device-connection-banner offline" id="device-connection-banner">
+              <div><i></i><span><b id="device-connection-title">Waiting for connection</b><small id="device-connection-copy">Syncthing will connect automatically when both devices approve each other.</small></span></div>
+              <span id="device-last-seen">Never seen</span>
+            </div>
+
+            <div class="device-detail-stats">
+              <div><span>Received</span><strong id="device-bytes-received">0 B</strong><small>This session</small></div>
+              <div><span>Sent</span><strong id="device-bytes-sent">0 B</strong><small>This session</small></div>
+              <div><span>Shared folders</span><strong id="device-shared-count">0</strong><small id="device-shared-copy">No folders shared</small></div>
+              <div><span>Connection</span><strong id="device-connection-type">—</strong><small id="device-connection-location">No active route</small></div>
+            </div>
+
+            <div class="device-detail-lower-grid">
+              <div class="device-information-block">
+                <div class="device-section-heading"><span>Connection details</span></div>
+                <dl class="device-information-list">
+                  <div><dt>Address</dt><dd id="device-address">Dynamic</dd></div>
+                  <div><dt>Client</dt><dd id="device-client-version">Unknown</dd></div>
+                  <div><dt>Compression</dt><dd id="device-compression">Metadata only</dd></div>
+                  <div><dt>Introducer</dt><dd id="device-introducer">No</dd></div>
+                  <div><dt>Auto-accept folders</dt><dd id="device-auto-accept">Off</dd></div>
+                </dl>
+              </div>
+              <div class="device-shared-block">
+                <div class="device-section-heading"><span>Folders shared with this device</span><small id="device-folder-count">0 folders</small></div>
+                <div class="device-folder-list" id="device-folder-list">
+                  <div class="device-no-folders">No folders are shared with this device.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Settings View -->
+    <div id="view-settings" class="view-content">
+      <div class="page-header settings-page-header">
+        <div class="settings-heading-copy">
+          <span class="settings-eyebrow">System configuration</span>
+          <h1>Settings</h1>
+          <p>Control how this device connects, transfers data, and exposes its local interface.</p>
+        </div>
+        <div class="settings-header-actions">
+          <span class="settings-save-state saved" id="settings-save-state"><i></i><span>All changes saved</span></span>
+          <button type="button" class="settings-discard-button" id="discard-settings-btn" disabled>Discard</button>
+          <button type="submit" class="settings-save-button" id="save-settings-btn" form="settings-form" disabled>Save changes</button>
+        </div>
+      </div>
+
+      <section class="settings-summary-grid" aria-label="Current configuration summary">
+        <article class="card settings-summary-card featured">
+          <span>This device</span>
+          <strong id="settings-summary-device">Loading…</strong>
+          <small id="settings-summary-id">Device ID unavailable</small>
+        </article>
+        <article class="card settings-summary-card">
+          <span>Connectivity</span>
+          <strong id="settings-summary-connectivity">—</strong>
+          <small id="settings-summary-services">Checking network services</small>
+        </article>
+        <article class="card settings-summary-card">
+          <span>Bandwidth</span>
+          <strong id="settings-summary-bandwidth">Unlimited</strong>
+          <small>Upload and download limits</small>
+        </article>
+        <article class="card settings-summary-card">
+          <span>Interface security</span>
+          <strong id="settings-summary-security">Local only</strong>
+          <small id="settings-summary-security-copy">Checking authentication</small>
+        </article>
+      </section>
+
+      <div class="settings-workspace">
+        <aside class="card settings-navigation-panel">
+          <div class="settings-navigation-heading">
+            <span>Configuration</span>
+            <small>Select a category</small>
+          </div>
+          <nav class="settings-navigation" aria-label="Settings categories">
+            <button type="button" class="settings-nav-item active" data-settings-panel="general" aria-selected="true">
+              <span class="settings-nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M5 21a7 7 0 0 1 14 0"></path></svg></span>
+              <span><b>General</b><small>Identity and behavior</small></span>
+            </button>
+            <button type="button" class="settings-nav-item" data-settings-panel="connections" aria-selected="false">
+              <span class="settings-nav-icon"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"></circle><circle cx="19" cy="5" r="2"></circle><circle cx="19" cy="19" r="2"></circle><path d="m7 11 10-5M7 13l10 5"></path></svg></span>
+              <span><b>Connections</b><small>Discovery and routing</small></span>
+            </button>
+            <button type="button" class="settings-nav-item" data-settings-panel="bandwidth" aria-selected="false">
+              <span class="settings-nav-icon"><svg viewBox="0 0 24 24"><path d="M4 17h4V9H4zM10 17h4V5h-4zM16 17h4v-6h-4z"></path></svg></span>
+              <span><b>Bandwidth</b><small>Transfer limits</small></span>
+            </button>
+            <button type="button" class="settings-nav-item" data-settings-panel="interface" aria-selected="false">
+              <span class="settings-nav-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"></rect><path d="M8 22h8M12 18v4"></path></svg></span>
+              <span><b>Interface &amp; security</b><small>Access and authentication</small></span>
+            </button>
+            <button type="button" class="settings-nav-item" data-settings-panel="privacy" aria-selected="false">
+              <span class="settings-nav-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg></span>
+              <span><b>Privacy</b><small>Reporting and diagnostics</small></span>
+            </button>
+          </nav>
+          <div class="settings-system-card">
+            <span>Syncthing service</span>
+            <div><i></i><b id="settings-service-state">Running</b></div>
+            <small id="settings-service-meta">Loading version…</small>
+          </div>
+        </aside>
+
+        <form class="card settings-form-panel" id="settings-form">
+          <section class="settings-panel active" data-settings-section="general" aria-labelledby="settings-general-title">
+            <div class="settings-panel-heading">
+              <div><span class="settings-panel-kicker">Device preferences</span><h2 id="settings-general-title">General</h2><p>Set the identity and day-to-day behavior of this Syncthing instance.</p></div>
+              <span class="settings-panel-badge">Core</span>
+            </div>
+            <div class="settings-field-grid">
+              <label class="settings-field wide">
+                <span>Device name</span>
+                <input type="text" id="setting-device-name" placeholder="Studio workstation" required autocomplete="off">
+                <small>Shown to other devices when you connect.</small>
+              </label>
+              <label class="settings-field">
+                <span>Reconnect interval</span>
+                <div class="settings-input-with-unit"><input type="number" id="setting-reconnect" min="5" step="1"><em>seconds</em></div>
+                <small>How quickly offline devices are retried.</small>
+              </label>
+              <label class="settings-field">
+                <span>Keep temporary files</span>
+                <div class="settings-input-with-unit"><input type="number" id="setting-keep-temporaries" min="0" step="1"><em>hours</em></div>
+                <small>Zero removes temporary files immediately.</small>
+              </label>
+            </div>
+            <div class="settings-toggle-list">
+              <label class="settings-toggle-row">
+                <span><b>Run with lower CPU priority</b><small>Reduce Syncthing’s impact while other applications are active.</small></span>
+                <input type="checkbox" id="setting-low-priority"><i></i>
+              </label>
+              <label class="settings-toggle-row">
+                <span><b>Use remote device names</b><small>Update configured names when a remote device announces a different name.</small></span>
+                <input type="checkbox" id="setting-overwrite-names"><i></i>
+              </label>
+            </div>
+          </section>
+
+          <section class="settings-panel" data-settings-section="connections" aria-labelledby="settings-connections-title" hidden>
+            <div class="settings-panel-heading">
+              <div><span class="settings-panel-kicker">Network discovery</span><h2 id="settings-connections-title">Connections</h2><p>Choose how Syncthing finds peers and accepts incoming connections.</p></div>
+              <span class="settings-panel-badge">Network</span>
+            </div>
+            <label class="settings-field wide">
+              <span>Listen addresses</span>
+              <textarea id="setting-listen" rows="3" placeholder="default"></textarea>
+              <small>Separate multiple addresses with commas or new lines. “default” enables the standard TCP and QUIC listeners.</small>
+            </label>
+            <div class="settings-toggle-list two-column">
+              <label class="settings-toggle-row">
+                <span><b>Global discovery</b><small>Find devices through the global discovery service.</small></span>
+                <input type="checkbox" id="setting-global-discovery"><i></i>
+              </label>
+              <label class="settings-toggle-row">
+                <span><b>Local discovery</b><small>Find devices on the same local network.</small></span>
+                <input type="checkbox" id="setting-local-discovery"><i></i>
+              </label>
+              <label class="settings-toggle-row">
+                <span><b>Relaying</b><small>Use relay servers when direct connections fail.</small></span>
+                <input type="checkbox" id="setting-relays"><i></i>
+              </label>
+              <label class="settings-toggle-row">
+                <span><b>NAT traversal</b><small>Automatically open a port through compatible routers.</small></span>
+                <input type="checkbox" id="setting-nat"><i></i>
+              </label>
+              <label class="settings-toggle-row">
+                <span><b>Announce LAN addresses</b><small>Tell remote devices about this device’s local addresses.</small></span>
+                <input type="checkbox" id="setting-announce-lan"><i></i>
+              </label>
+            </div>
+          </section>
+
+          <section class="settings-panel" data-settings-section="bandwidth" aria-labelledby="settings-bandwidth-title" hidden>
+            <div class="settings-panel-heading">
+              <div><span class="settings-panel-kicker">Transfer controls</span><h2 id="settings-bandwidth-title">Bandwidth</h2><p>Cap transfer speed or leave a value at zero for unlimited throughput.</p></div>
+              <span class="settings-panel-badge">Performance</span>
+            </div>
+            <div class="settings-field-grid">
+              <label class="settings-field">
+                <span>Maximum upload</span>
+                <div class="settings-input-with-unit"><input type="number" id="setting-max-send" min="0" step="1"><em>KiB/s</em></div>
+                <small>Zero allows unlimited upload speed.</small>
+              </label>
+              <label class="settings-field">
+                <span>Maximum download</span>
+                <div class="settings-input-with-unit"><input type="number" id="setting-max-recv" min="0" step="1"><em>KiB/s</em></div>
+                <small>Zero allows unlimited download speed.</small>
+              </label>
+              <label class="settings-field">
+                <span>Concurrent folders</span>
+                <input type="number" id="setting-folder-concurrency" min="-1" step="1">
+                <small>Zero selects a CPU-based default; −1 is unlimited.</small>
+              </label>
+              <label class="settings-field">
+                <span>Maximum connections</span>
+                <input type="number" id="setting-connection-limit" min="0" step="1">
+                <small>Zero allows any number of connections.</small>
+              </label>
+            </div>
+            <div class="settings-toggle-list">
+              <label class="settings-toggle-row">
+                <span><b>Apply limits on the local network</b><small>Use the upload and download caps for LAN transfers too.</small></span>
+                <input type="checkbox" id="setting-limit-lan"><i></i>
+              </label>
+            </div>
+          </section>
+
+          <section class="settings-panel" data-settings-section="interface" aria-labelledby="settings-interface-title" hidden>
+            <div class="settings-panel-heading">
+              <div><span class="settings-panel-kicker">Local administration</span><h2 id="settings-interface-title">Interface &amp; security</h2><p>Manage where the local web interface listens and how administrators sign in.</p></div>
+              <span class="settings-panel-badge security">Sensitive</span>
+            </div>
+            <div class="settings-field-grid">
+              <label class="settings-field">
+                <span>GUI listen address</span>
+                <input type="text" id="setting-gui" placeholder="127.0.0.1:8384" readonly>
+                <small>Managed by the desktop app to keep the local API available.</small>
+              </label>
+              <label class="settings-field">
+                <span>Interface theme</span>
+                <select id="setting-theme">
+                  <option value="default">System default</option>
+                  <option value="dark">Dark</option>
+                  <option value="black">Black</option>
+                  <option value="light">Light</option>
+                </select>
+                <small>Applies to Syncthing’s built-in web interface.</small>
+              </label>
+              <label class="settings-field">
+                <span>Administrator username</span>
+                <input type="text" id="setting-gui-user" placeholder="Optional" autocomplete="username">
+                <small>Set both a username and password to enable authentication.</small>
+              </label>
+              <label class="settings-field">
+                <span>New administrator password</span>
+                <input type="password" id="setting-gui-password" placeholder="Leave blank to keep current password" autocomplete="new-password">
+                <small>Passwords are hashed by Syncthing before storage.</small>
+              </label>
+              <label class="settings-field wide settings-api-field">
+                <span>API key</span>
+                <div><input type="password" id="setting-api" readonly><button type="button" id="settings-toggle-api">Show</button><button type="button" id="settings-copy-api">Copy</button></div>
+                <small>Applications with this key can control Syncthing. Keep it private.</small>
+              </label>
+            </div>
+            <div class="settings-toggle-list">
+              <label class="settings-toggle-row">
+                <span><b>HTTPS for the local interface</b><small>Shown for reference. Transport is managed by the desktop application.</small></span>
+                <input type="checkbox" id="setting-gui-tls" disabled><i></i>
+              </label>
+            </div>
+            <div class="settings-security-note">
+              <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12h6M12 9v6"></path></svg>
+              <span><b>Desktop-managed endpoint</b><small>The address and protocol are locked because changing them would disconnect this application from Syncthing.</small></span>
+            </div>
+          </section>
+
+          <section class="settings-panel" data-settings-section="privacy" aria-labelledby="settings-privacy-title" hidden>
+            <div class="settings-panel-heading">
+              <div><span class="settings-panel-kicker">Diagnostics</span><h2 id="settings-privacy-title">Privacy</h2><p>Choose which anonymous diagnostics this instance may send to the Syncthing project.</p></div>
+              <span class="settings-panel-badge">Optional</span>
+            </div>
+            <div class="settings-toggle-list">
+              <label class="settings-toggle-row">
+                <span><b>Anonymous usage reporting</b><small>Share aggregate version, platform, and feature statistics. File names and contents are never included.</small></span>
+                <input type="checkbox" id="setting-usage-reporting"><i></i>
+              </label>
+              <label class="settings-toggle-row">
+                <span><b>Crash reporting</b><small>Send diagnostic crash reports to help improve Syncthing stability.</small></span>
+                <input type="checkbox" id="setting-crash-reporting"><i></i>
+              </label>
+              <label class="settings-toggle-row">
+                <span><b>Audit logging</b><small>Record configuration and API activity to the audit log. Requires a restart.</small></span>
+                <input type="checkbox" id="setting-audit"><i></i>
+              </label>
+            </div>
+            <div class="settings-privacy-card">
+              <span>Local-first by design</span>
+              <p>Syncthing transfers files directly between your approved devices. It does not upload your data to a central storage service.</p>
+            </div>
+          </section>
+
+          <div class="settings-form-error" id="settings-form-error" role="alert"></div>
+        </form>
+      </div>
+
+      <div class="settings-restart-banner" id="settings-restart-banner" hidden>
+        <div><i></i><span><b>Restart required</b><small>Some saved changes will take effect after Syncthing restarts.</small></span></div>
+        <button type="button" id="settings-restart-dismiss">Dismiss</button>
+      </div>
+    </div>
+
+    <!-- Advanced View -->
+    <div id="view-advanced" class="view-content">
+      <div class="page-header advanced-page-header">
+        <div class="advanced-heading-copy">
+          <span class="advanced-eyebrow">Diagnostics &amp; maintenance</span>
+          <h1>Advanced</h1>
+          <p>Inspect service health, review logs, tune diagnostics, and perform guarded maintenance.</p>
+        </div>
+        <div class="advanced-header-actions">
+          <span class="advanced-live-state" id="advanced-live-state"><i></i><span>Service online</span></span>
+          <button type="button" class="advanced-refresh-button" id="advanced-refresh-btn">
+            <svg viewBox="0 0 24 24"><path d="M20 6v5h-5"></path><path d="M19 11a7 7 0 1 0 1 5"></path></svg>
+            Refresh diagnostics
+          </button>
+        </div>
+      </div>
+
+      <section class="advanced-summary-grid" aria-label="System diagnostic summary">
+        <article class="card advanced-summary-card featured">
+          <span>Service health</span>
+          <strong id="advanced-summary-health">Checking…</strong>
+          <small id="advanced-summary-uptime">Waiting for Syncthing</small>
+        </article>
+        <article class="card advanced-summary-card">
+          <span>Version</span>
+          <strong id="advanced-summary-version">—</strong>
+          <small id="advanced-summary-platform">Platform unavailable</small>
+        </article>
+        <article class="card advanced-summary-card">
+          <span>Memory allocated</span>
+          <strong id="advanced-summary-memory">0 B</strong>
+          <small id="advanced-summary-workers">0 active workers</small>
+        </article>
+        <article class="card advanced-summary-card">
+          <span>Recent issues</span>
+          <strong id="advanced-summary-errors">0</strong>
+          <small id="advanced-summary-error-copy">No errors reported</small>
+        </article>
+      </section>
+
+      <div class="advanced-workspace">
+        <aside class="card advanced-navigation-panel">
+          <div class="advanced-navigation-heading"><span>Developer tools</span><small>Choose a diagnostic view</small></div>
+          <nav class="advanced-navigation" aria-label="Advanced categories">
+            <button type="button" class="advanced-nav-item active" data-advanced-panel="overview" aria-selected="true">
+              <span class="advanced-nav-icon"><svg viewBox="0 0 24 24"><path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z"></path></svg></span>
+              <span><b>Overview</b><small>Health and system paths</small></span>
+            </button>
+            <button type="button" class="advanced-nav-item" data-advanced-panel="logs" aria-selected="false">
+              <span class="advanced-nav-icon"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"></path></svg></span>
+              <span><b>System logs</b><small>Recent service activity</small></span>
+              <em id="advanced-log-count">0</em>
+            </button>
+            <button type="button" class="advanced-nav-item" data-advanced-panel="errors" aria-selected="false">
+              <span class="advanced-nav-icon"><svg viewBox="0 0 24 24"><path d="M12 3 2 21h20z"></path><path d="M12 9v5M12 18h.01"></path></svg></span>
+              <span><b>Errors</b><small>Actionable service issues</small></span>
+              <em class="warning" id="advanced-error-count">0</em>
+            </button>
+            <button type="button" class="advanced-nav-item" data-advanced-panel="debug" aria-selected="false">
+              <span class="advanced-nav-icon"><svg viewBox="0 0 24 24"><path d="M9 9h6v6H9zM3 12h6M15 12h6M12 3v6M12 15v6M5.5 5.5 9 9M15 15l3.5 3.5M18.5 5.5 15 9M9 15l-3.5 3.5"></path></svg></span>
+              <span><b>Debug levels</b><small>Facility-specific logging</small></span>
+            </button>
+            <button type="button" class="advanced-nav-item" data-advanced-panel="maintenance" aria-selected="false">
+              <span class="advanced-nav-icon"><svg viewBox="0 0 24 24"><path d="M14 6 4 16l4 4L18 10"></path><path d="m13 7 4-4 4 4-4 4"></path></svg></span>
+              <span><b>Maintenance</b><small>Updates and service actions</small></span>
+            </button>
+          </nav>
+          <div class="advanced-safety-note"><i></i><span><b>Guarded actions</b><small>Destructive database reset and forced shutdown are intentionally unavailable here.</small></span></div>
+        </aside>
+
+        <section class="card advanced-content-panel">
+          <div class="advanced-panel active" data-advanced-section="overview">
+            <div class="advanced-panel-heading">
+              <div><span class="advanced-panel-kicker">Runtime status</span><h2>System overview</h2><p>Live internal health and filesystem locations used by this instance.</p></div>
+              <span class="advanced-panel-badge healthy" id="advanced-overview-badge"><i></i>Healthy</span>
+            </div>
+            <div class="advanced-runtime-grid">
+              <div><span>Uptime</span><strong id="advanced-runtime-uptime">—</strong></div>
+              <div><span>Workers</span><strong id="advanced-runtime-workers">0</strong></div>
+              <div><span>Heap in use</span><strong id="advanced-runtime-heap">0 B</strong></div>
+              <div><span>Discovery methods</span><strong id="advanced-runtime-discovery">0</strong></div>
+            </div>
+            <div class="advanced-section-block">
+              <div class="advanced-section-title"><span>Connection services</span><small id="advanced-service-count">0 services</small></div>
+              <div class="advanced-service-list" id="advanced-service-list"><div class="advanced-empty-state">Loading connection services…</div></div>
+            </div>
+            <div class="advanced-section-block">
+              <div class="advanced-section-title"><span>Internal paths</span><small>Read-only</small></div>
+              <div class="advanced-path-list" id="advanced-path-list"><div class="advanced-empty-state">Loading system paths…</div></div>
+            </div>
+          </div>
+
+          <div class="advanced-panel" data-advanced-section="logs" hidden>
+            <div class="advanced-panel-heading">
+              <div><span class="advanced-panel-kicker">Live activity</span><h2>System logs</h2><p>Review recent messages emitted by the Syncthing service.</p></div>
+              <label class="advanced-auto-refresh"><input type="checkbox" id="advanced-auto-refresh"><i></i><span>Auto-refresh</span></label>
+            </div>
+            <div class="advanced-log-toolbar">
+              <label class="advanced-log-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input type="search" id="advanced-log-search" placeholder="Search log messages" autocomplete="off"></label>
+              <select id="advanced-log-filter" aria-label="Filter log severity"><option value="all">All levels</option><option value="error">Errors</option><option value="warning">Warnings</option><option value="info">Info</option><option value="debug">Debug</option></select>
+              <button type="button" id="advanced-copy-logs">Copy visible</button>
+            </div>
+            <div class="advanced-log-list" id="advanced-logs"><div class="advanced-empty-state">Loading logs…</div></div>
+          </div>
+
+          <div class="advanced-panel" data-advanced-section="errors" hidden>
+            <div class="advanced-panel-heading">
+              <div><span class="advanced-panel-kicker">Service alerts</span><h2>Recent errors</h2><p>Errors remain here until cleared or the service’s in-memory history expires.</p></div>
+              <button type="button" class="advanced-clear-button" id="advanced-clear-errors" disabled>Clear all errors</button>
+            </div>
+            <div class="advanced-error-list" id="advanced-error-list"><div class="advanced-empty-state">Loading errors…</div></div>
+          </div>
+
+          <div class="advanced-panel" data-advanced-section="debug" hidden>
+            <div class="advanced-panel-heading">
+              <div><span class="advanced-panel-kicker">Diagnostic verbosity</span><h2>Debug levels</h2><p>Temporarily increase logging for a specific subsystem while troubleshooting.</p></div>
+              <button type="button" class="advanced-apply-button" id="advanced-apply-levels" disabled>Apply levels</button>
+            </div>
+            <div class="advanced-debug-warning"><i>!</i><span><b>Verbose logging can grow quickly.</b><small>Return facilities to Info after collecting the details you need.</small></span></div>
+            <label class="advanced-debug-search"><input type="search" id="advanced-debug-search" placeholder="Find a log facility" autocomplete="off"></label>
+            <div class="advanced-debug-list" id="advanced-debug-list"><div class="advanced-empty-state">Loading log facilities…</div></div>
+          </div>
+
+          <div class="advanced-panel" data-advanced-section="maintenance" hidden>
+            <div class="advanced-panel-heading">
+              <div><span class="advanced-panel-kicker">Service care</span><h2>Maintenance</h2><p>Export diagnostics, review updates, or restart the managed service.</p></div>
+              <span class="advanced-panel-badge" id="advanced-restart-state">No restart pending</span>
+            </div>
+            <div class="advanced-maintenance-list">
+              <article class="advanced-maintenance-row">
+                <span class="advanced-maintenance-icon"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg></span>
+                <span><b>Support bundle</b><small>Download logs, runtime profiles, and a redacted configuration for troubleshooting.</small></span>
+                <button type="button" id="advanced-support-bundle">Download bundle</button>
+              </article>
+              <article class="advanced-maintenance-row">
+                <span class="advanced-maintenance-icon"><svg viewBox="0 0 24 24"><path d="M20 6v5h-5"></path><path d="M19 11a7 7 0 1 0 1 5"></path></svg></span>
+                <span><b>Software update</b><small id="advanced-update-copy">Checking the installed version…</small></span>
+                <button type="button" id="advanced-check-update">Check again</button>
+                <button type="button" class="primary" id="advanced-install-update" hidden>Install update</button>
+              </article>
+              <article class="advanced-maintenance-row caution">
+                <span class="advanced-maintenance-icon"><svg viewBox="0 0 24 24"><path d="M20 6v5h-5"></path><path d="M19 11a7 7 0 1 0 1 5"></path></svg></span>
+                <span><b>Restart Syncthing</b><small>Briefly interrupts synchronization while the managed service restarts.</small></span>
+                <button type="button" id="advanced-restart-service">Restart service</button>
+              </article>
+            </div>
+            <div class="advanced-action-feedback" id="advanced-action-feedback" role="status"></div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <!-- Folders View -->
+    <div id="view-folders" class="view-content active">
+      <div class="page-header folders-page-header">
+        <div class="folders-heading-copy">
+          <span class="folders-eyebrow">Sync management</span>
+          <h1>Folders</h1>
+          <p>Monitor shared data, sync progress, and connected devices.</p>
+        </div>
+        <button class="folders-add-button" id="add-folder-btn">
+          <span aria-hidden="true">+</span>Add folder
+        </button>
+      </div>
+
+      <section class="folders-summary-grid" aria-label="Folder summary">
+        <article class="card folder-summary-card featured">
+          <span class="folder-summary-label">Total folders</span>
+          <strong id="metric-folders-count">0</strong>
+          <small id="folders-summary-device-count">Across 0 remote devices</small>
+        </article>
+        <article class="card folder-summary-card">
+          <span class="folder-summary-label"><i class="folder-summary-dot healthy"></i>Up to date</span>
+          <strong id="folders-summary-healthy">0</strong>
+          <small>Fully synchronized</small>
+        </article>
+        <article class="card folder-summary-card">
+          <span class="folder-summary-label"><i class="folder-summary-dot syncing"></i>Syncing</span>
+          <strong id="folders-summary-syncing">0</strong>
+          <small>Active or scanning</small>
+        </article>
+        <article class="card folder-summary-card">
+          <span class="folder-summary-label"><i class="folder-summary-dot attention"></i>Needs attention</span>
+          <strong id="folders-summary-attention">0</strong>
+          <small>Paused, offline, or errors</small>
+        </article>
+        <article class="card folder-summary-card">
+          <span class="folder-summary-label">Data managed</span>
+          <strong id="metric-total-data">0 B</strong>
+          <small>Global shared content</small>
+        </article>
+      </section>
+
+      <section class="folders-toolbar" aria-label="Folder controls">
+        <div class="folders-filter-tabs" role="tablist" aria-label="Filter folders by status">
+          <button class="folder-filter active" data-folder-filter="all" role="tab" aria-selected="true">All <span id="folder-filter-all-count">0</span></button>
+          <button class="folder-filter" data-folder-filter="healthy" role="tab" aria-selected="false">Up to date <span id="folder-filter-healthy-count">0</span></button>
+          <button class="folder-filter" data-folder-filter="syncing" role="tab" aria-selected="false">Syncing <span id="folder-filter-syncing-count">0</span></button>
+          <button class="folder-filter" data-folder-filter="attention" role="tab" aria-selected="false">Attention <span id="folder-filter-attention-count">0</span></button>
+        </div>
+        <label class="folders-search">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg>
+          <input type="search" id="folder-search-input" placeholder="Search by name, ID, or path" autocomplete="off">
+        </label>
+      </section>
+
+      <div class="folders-workspace">
+        <aside class="card folders-list-panel" aria-label="Folders">
+          <div class="folders-panel-heading">
+            <div>
+              <span>Your folders</span>
+              <small id="folders-visible-count">Loading folders…</small>
+            </div>
+            <span class="folders-refresh-indicator"><i></i>Live</span>
+          </div>
+          <div class="folders-list" id="folders-list">
+            <div class="folder-list-empty">Loading folder data…</div>
+          </div>
+        </aside>
+
+        <section class="card folder-detail-panel" id="folder-detail-panel" aria-live="polite">
+          <div class="folder-detail-empty" id="folder-detail-empty">
+            <div class="folder-empty-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2H21v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M3 7.5V6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1.5"></path></svg>
+            </div>
+            <h2>Select a folder</h2>
+            <p>Choose a folder to view its sync health, storage, and sharing details.</p>
+          </div>
+
+          <div class="folder-detail-content" id="folder-detail-content" hidden>
+            <div class="folder-detail-header">
+              <div class="folder-detail-identity">
+                <div class="folder-detail-icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24"><path d="M3 7.5h6l2 2H21v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M3 7.5V6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1.5"></path></svg>
+                </div>
+                <div>
+                  <span class="folder-detail-kicker">Folder details</span>
+                  <div class="folder-detail-title-row">
+                    <h2 id="detail-title">Folder</h2>
+                    <span class="folder-state-badge healthy" id="detail-status">Up to date</span>
+                  </div>
+                  <span class="folder-detail-id" id="detail-id">—</span>
+                </div>
+              </div>
+              <button class="folder-rescan-button" id="folder-rescan-btn">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6v5h-5"></path><path d="M19 11a7 7 0 1 0 1 5"></path></svg>
+                Rescan now
+              </button>
+            </div>
+
+            <div class="folder-path-card">
+              <span>Local path</span>
+              <code id="detail-path">—</code>
+            </div>
+
+            <div class="folder-progress-block">
+              <div class="folder-progress-heading">
+                <div><span>Sync completion</span><small id="detail-progress-copy">No data indexed</small></div>
+                <strong id="detail-progress-percent">0%</strong>
+              </div>
+              <div class="folder-progress-track"><span id="detail-progress-bar"></span></div>
+            </div>
+
+            <div class="folder-detail-stats">
+              <div><span>Global size</span><strong id="detail-global-size">0 B</strong></div>
+              <div><span>Local size</span><strong id="detail-local-size">0 B</strong></div>
+              <div><span>Files</span><strong id="detail-files">0</strong></div>
+              <div><span>Directories</span><strong id="detail-dirs">0</strong></div>
+              <div><span>Pending</span><strong id="detail-pending">0</strong></div>
+            </div>
+
+            <div class="folder-detail-lower-grid">
+              <div class="folder-information-block">
+                <div class="folder-section-heading"><span>Configuration</span></div>
+                <dl class="folder-information-list">
+                  <div><dt>Folder type</dt><dd id="detail-folder-type">—</dd></div>
+                  <div><dt>Watch for changes</dt><dd id="detail-watch-state">—</dd></div>
+                  <div><dt>Rescan interval</dt><dd id="detail-rescan-interval">—</dd></div>
+                  <div><dt>Last scanned</dt><dd id="detail-scanned">—</dd></div>
+                  <div><dt>Last file synced</dt><dd id="detail-last-file">—</dd></div>
+                </dl>
+              </div>
+
+              <div class="folder-sharing-block">
+                <div class="folder-section-heading"><span>Shared with</span><small id="detail-device-count">0 devices</small></div>
+                <div class="folder-device-list" id="detail-device-list">
+                  <div class="folder-no-devices">Not shared with another device</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div> <!-- End view-folders -->
+
+    <div class="folder-modal-backdrop" id="add-folder-modal" hidden>
+      <section class="folder-modal" role="dialog" aria-modal="true" aria-labelledby="add-folder-title">
+        <div class="folder-modal-header">
+          <div>
+            <span class="folders-eyebrow">New share</span>
+            <h2 id="add-folder-title">Add a folder</h2>
+            <p>Choose a local path to begin indexing and sharing.</p>
+          </div>
+          <button type="button" class="folder-modal-close" id="add-folder-close" aria-label="Close">×</button>
+        </div>
+        <form id="add-folder-form">
+          <label class="folder-form-field">
+            <span>Folder name</span>
+            <input type="text" id="add-folder-label" placeholder="Creative Projects" autocomplete="off">
+          </label>
+          <label class="folder-form-field">
+            <span>Folder ID</span>
+            <input type="text" id="add-folder-id" placeholder="creative-projects" pattern="[A-Za-z0-9._-]+" required autocomplete="off">
+            <small>Used to identify this folder across devices.</small>
+          </label>
+          <div class="folder-form-field">
+            <label for="add-folder-path">Folder on this device</label>
+            <div class="folder-path-picker">
+              <input type="text" id="add-folder-path" placeholder="Choose a folder or enter its path" required autocomplete="off">
+              <button type="button" id="add-folder-browse" class="folder-browse-button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5h6l2 2H21v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M3 7.5V6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1.5"></path></svg>
+                <span>Choose folder</span>
+              </button>
+            </div>
+            <small id="add-folder-path-state" class="folder-path-state" aria-live="polite">Select a folder stored on this device.</small>
+          </div>
+          <label class="folder-form-field">
+            <span>Folder type</span>
+            <select id="add-folder-type">
+              <option value="sendreceive">Send &amp; Receive</option>
+              <option value="sendonly">Send Only</option>
+              <option value="receiveonly">Receive Only</option>
+            </select>
+          </label>
+          <label class="folder-form-toggle">
+            <input type="checkbox" id="add-folder-watch" checked>
+            <span><b>Watch for changes</b><small>Sync new changes without waiting for the next scheduled scan.</small></span>
+          </label>
+          <div class="folder-form-error" id="add-folder-error" role="alert"></div>
+          <div class="folder-modal-actions">
+            <button type="button" class="folder-modal-cancel" id="add-folder-cancel">Cancel</button>
+            <button type="submit" class="folder-modal-submit" id="add-folder-submit">Create folder</button>
+          </div>
+        </form>
+      </section>
+    </div>
+
+    <div class="device-modal-backdrop" id="add-device-modal" hidden>
+      <section class="device-modal" role="dialog" aria-modal="true" aria-labelledby="add-device-title">
+        <div class="device-modal-header">
+          <div>
+            <span class="devices-eyebrow">Secure pairing</span>
+            <h2 id="add-device-title">Add a remote device</h2>
+            <p>Enter the Device ID shown by Syncthing on the other computer or phone.</p>
+          </div>
+          <button type="button" class="device-modal-close" id="add-device-close" aria-label="Close">×</button>
+        </div>
+
+        <div class="pending-devices" id="pending-devices" hidden>
+          <div class="pending-devices-heading">
+            <span>Nearby devices requesting access</span>
+            <small>Select one to fill the form</small>
+          </div>
+          <div class="pending-device-list" id="pending-device-list"></div>
+        </div>
+
+        <form id="add-device-form">
+          <label class="device-form-field device-id-field">
+            <span>Remote Device ID</span>
+            <textarea id="add-device-id" rows="2" placeholder="AAAAAAA-BBBBBBB-CCCCCCC-DDDDDDD-EEEEEEE-FFFFFFF-GGGGGGG-HHHHHHH" spellcheck="false" autocomplete="off" required></textarea>
+            <small>Find this under Actions → Show ID on the other device.</small>
+          </label>
+          <div class="device-form-grid">
+            <label class="device-form-field">
+              <span>Device name</span>
+              <input type="text" id="add-device-name" placeholder="Office laptop" autocomplete="off">
+            </label>
+            <label class="device-form-field">
+              <span>Connection address</span>
+              <input type="text" id="add-device-address" value="dynamic" placeholder="dynamic or tcp://host:22000" autocomplete="off">
+              <small>Use “dynamic” for automatic discovery.</small>
+            </label>
+          </div>
+          <label class="device-form-field">
+            <span>Compression</span>
+            <select id="add-device-compression">
+              <option value="metadata">Metadata only (recommended)</option>
+              <option value="always">All data</option>
+              <option value="never">Disabled</option>
+            </select>
+          </label>
+
+          <fieldset class="device-folder-picker">
+            <legend>Share folders now</legend>
+            <p>Select folders this device should be allowed to synchronize. You can leave all unchecked and share later.</p>
+            <div class="device-folder-options" id="add-device-folder-options">
+              <div class="device-folder-options-empty">No folders are configured yet.</div>
+            </div>
+          </fieldset>
+
+          <div class="device-form-options">
+            <label class="device-form-toggle">
+              <input type="checkbox" id="add-device-auto-accept">
+              <span><b>Automatically accept new folders</b><small>Future folder invitations from this device will be accepted automatically.</small></span>
+            </label>
+            <label class="device-form-toggle">
+              <input type="checkbox" id="add-device-introducer">
+              <span><b>Use as introducer</b><small>Allow this device to introduce other trusted devices.</small></span>
+            </label>
+          </div>
+
+          <div class="device-pairing-note">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+            <span><b>Both devices must approve the pairing.</b> After saving here, add this device’s ID on the remote device using your ID shown on the Devices page.</span>
+          </div>
+
+          <div class="device-form-error" id="add-device-error" role="alert"></div>
+          <div class="device-modal-actions">
+            <button type="button" class="device-modal-cancel" id="add-device-cancel">Cancel</button>
+            <button type="submit" class="device-modal-submit" id="add-device-submit">Add and connect</button>
+          </div>
+        </form>
+      </section>
+    </div>
+  </div> <!-- End app-container -->
+  <script src="app.js"></script>
 </body>
 </html>

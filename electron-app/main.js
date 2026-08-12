@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain } = require('electron');
 const { spawn } = require('child_process');
 const path = require('path');
 const http = require('http');
@@ -16,7 +16,8 @@ function createWindow() {
     height: 800,
     webPreferences: {
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      preload: path.join(__dirname, 'preload.js')
     }
   });
 
@@ -26,6 +27,22 @@ function createWindow() {
     mainWindow = null;
   });
 }
+
+ipcMain.handle('dialog:select-folder', async (event) => {
+  const ownerWindow = BrowserWindow.fromWebContents(event.sender) || mainWindow;
+  if (!ownerWindow) return { canceled: true, path: null };
+
+  const result = await dialog.showOpenDialog(ownerWindow, {
+    title: 'Choose a folder to sync',
+    buttonLabel: 'Select folder',
+    properties: ['openDirectory', 'createDirectory']
+  });
+
+  return {
+    canceled: result.canceled,
+    path: result.filePaths[0] || null
+  };
+});
 
 function checkSyncthingHealth(callback) {
   const req = http.get({
@@ -61,7 +78,11 @@ function waitForSyncthingAndStart() {
 
 app.on('ready', () => {
   console.log(`Starting Syncthing from: ${syncthingBinary}`);
-  syncthingProcess = spawn(syncthingBinary, ['--no-browser', '--gui-apikey=electron-ui-key'], {
+  syncthingProcess = spawn(syncthingBinary, [
+    '--no-browser',
+    '--gui-address=http://127.0.0.1:8384',
+    '--gui-apikey=electron-ui-key'
+  ], {
     stdio: 'inherit'
   });
 
