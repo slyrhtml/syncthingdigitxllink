@@ -364,41 +364,415 @@
     </div>
 
     <!-- Settings View -->
-    <div id="view-settings" class="view-content placeholder-view" style="justify-content: flex-start; align-items: stretch; background: transparent; padding: 0;">
-      <div class="page-header">
-        <div class="title-section"><h1>Configuration</h1></div>
+    <div id="view-settings" class="view-content">
+      <div class="page-header settings-page-header">
+        <div class="settings-heading-copy">
+          <span class="settings-eyebrow">System configuration</span>
+          <h1>Settings</h1>
+          <p>Control how this device connects, transfers data, and exposes its local interface.</p>
+        </div>
+        <div class="settings-header-actions">
+          <span class="settings-save-state saved" id="settings-save-state"><i></i><span>All changes saved</span></span>
+          <button type="button" class="settings-discard-button" id="discard-settings-btn" disabled>Discard</button>
+          <button type="submit" class="settings-save-button" id="save-settings-btn" form="settings-form" disabled>Save changes</button>
+        </div>
       </div>
-      <div class="card form-card">
-        <div class="form-group">
-          <label>Device Name</label>
-          <input type="text" id="setting-device-name" class="styled-input">
-        </div>
-        <div class="form-group">
-          <label>Listen Addresses</label>
-          <input type="text" id="setting-listen" class="styled-input">
-        </div>
-        <div class="form-group">
-          <label>GUI Address</label>
-          <input type="text" id="setting-gui" class="styled-input">
-        </div>
-        <div class="form-group">
-          <label>API Key</label>
-          <input type="text" id="setting-api" class="styled-input" readonly>
-        </div>
-        <button class="pay-out-btn-green" style="align-self: flex-start; margin-top: 16px;" id="save-settings-btn">Save Changes</button>
+
+      <section class="settings-summary-grid" aria-label="Current configuration summary">
+        <article class="card settings-summary-card featured">
+          <span>This device</span>
+          <strong id="settings-summary-device">Loading…</strong>
+          <small id="settings-summary-id">Device ID unavailable</small>
+        </article>
+        <article class="card settings-summary-card">
+          <span>Connectivity</span>
+          <strong id="settings-summary-connectivity">—</strong>
+          <small id="settings-summary-services">Checking network services</small>
+        </article>
+        <article class="card settings-summary-card">
+          <span>Bandwidth</span>
+          <strong id="settings-summary-bandwidth">Unlimited</strong>
+          <small>Upload and download limits</small>
+        </article>
+        <article class="card settings-summary-card">
+          <span>Interface security</span>
+          <strong id="settings-summary-security">Local only</strong>
+          <small id="settings-summary-security-copy">Checking authentication</small>
+        </article>
+      </section>
+
+      <div class="settings-workspace">
+        <aside class="card settings-navigation-panel">
+          <div class="settings-navigation-heading">
+            <span>Configuration</span>
+            <small>Select a category</small>
+          </div>
+          <nav class="settings-navigation" aria-label="Settings categories">
+            <button type="button" class="settings-nav-item active" data-settings-panel="general" aria-selected="true">
+              <span class="settings-nav-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"></circle><path d="M5 21a7 7 0 0 1 14 0"></path></svg></span>
+              <span><b>General</b><small>Identity and behavior</small></span>
+            </button>
+            <button type="button" class="settings-nav-item" data-settings-panel="connections" aria-selected="false">
+              <span class="settings-nav-icon"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="2"></circle><circle cx="19" cy="5" r="2"></circle><circle cx="19" cy="19" r="2"></circle><path d="m7 11 10-5M7 13l10 5"></path></svg></span>
+              <span><b>Connections</b><small>Discovery and routing</small></span>
+            </button>
+            <button type="button" class="settings-nav-item" data-settings-panel="bandwidth" aria-selected="false">
+              <span class="settings-nav-icon"><svg viewBox="0 0 24 24"><path d="M4 17h4V9H4zM10 17h4V5h-4zM16 17h4v-6h-4z"></path></svg></span>
+              <span><b>Bandwidth</b><small>Transfer limits</small></span>
+            </button>
+            <button type="button" class="settings-nav-item" data-settings-panel="interface" aria-selected="false">
+              <span class="settings-nav-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"></rect><path d="M8 22h8M12 18v4"></path></svg></span>
+              <span><b>Interface &amp; security</b><small>Access and authentication</small></span>
+            </button>
+            <button type="button" class="settings-nav-item" data-settings-panel="privacy" aria-selected="false">
+              <span class="settings-nav-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="m9 12 2 2 4-4"></path></svg></span>
+              <span><b>Privacy</b><small>Reporting and diagnostics</small></span>
+            </button>
+          </nav>
+          <div class="settings-system-card">
+            <span>Syncthing service</span>
+            <div><i></i><b id="settings-service-state">Running</b></div>
+            <small id="settings-service-meta">Loading version…</small>
+          </div>
+        </aside>
+
+        <form class="card settings-form-panel" id="settings-form">
+          <section class="settings-panel active" data-settings-section="general" aria-labelledby="settings-general-title">
+            <div class="settings-panel-heading">
+              <div><span class="settings-panel-kicker">Device preferences</span><h2 id="settings-general-title">General</h2><p>Set the identity and day-to-day behavior of this Syncthing instance.</p></div>
+              <span class="settings-panel-badge">Core</span>
+            </div>
+            <div class="settings-field-grid">
+              <label class="settings-field wide">
+                <span>Device name</span>
+                <input type="text" id="setting-device-name" placeholder="Studio workstation" required autocomplete="off">
+                <small>Shown to other devices when you connect.</small>
+              </label>
+              <label class="settings-field">
+                <span>Reconnect interval</span>
+                <div class="settings-input-with-unit"><input type="number" id="setting-reconnect" min="5" step="1"><em>seconds</em></div>
+                <small>How quickly offline devices are retried.</small>
+              </label>
+              <label class="settings-field">
+                <span>Keep temporary files</span>
+                <div class="settings-input-with-unit"><input type="number" id="setting-keep-temporaries" min="0" step="1"><em>hours</em></div>
+                <small>Zero removes temporary files immediately.</small>
+              </label>
+            </div>
+            <div class="settings-toggle-list">
+              <label class="settings-toggle-row">
+                <span><b>Run with lower CPU priority</b><small>Reduce Syncthing’s impact while other applications are active.</small></span>
+                <input type="checkbox" id="setting-low-priority"><i></i>
+              </label>
+              <label class="settings-toggle-row">
+                <span><b>Use remote device names</b><small>Update configured names when a remote device announces a different name.</small></span>
+                <input type="checkbox" id="setting-overwrite-names"><i></i>
+              </label>
+            </div>
+          </section>
+
+          <section class="settings-panel" data-settings-section="connections" aria-labelledby="settings-connections-title" hidden>
+            <div class="settings-panel-heading">
+              <div><span class="settings-panel-kicker">Network discovery</span><h2 id="settings-connections-title">Connections</h2><p>Choose how Syncthing finds peers and accepts incoming connections.</p></div>
+              <span class="settings-panel-badge">Network</span>
+            </div>
+            <label class="settings-field wide">
+              <span>Listen addresses</span>
+              <textarea id="setting-listen" rows="3" placeholder="default"></textarea>
+              <small>Separate multiple addresses with commas or new lines. “default” enables the standard TCP and QUIC listeners.</small>
+            </label>
+            <div class="settings-toggle-list two-column">
+              <label class="settings-toggle-row">
+                <span><b>Global discovery</b><small>Find devices through the global discovery service.</small></span>
+                <input type="checkbox" id="setting-global-discovery"><i></i>
+              </label>
+              <label class="settings-toggle-row">
+                <span><b>Local discovery</b><small>Find devices on the same local network.</small></span>
+                <input type="checkbox" id="setting-local-discovery"><i></i>
+              </label>
+              <label class="settings-toggle-row">
+                <span><b>Relaying</b><small>Use relay servers when direct connections fail.</small></span>
+                <input type="checkbox" id="setting-relays"><i></i>
+              </label>
+              <label class="settings-toggle-row">
+                <span><b>NAT traversal</b><small>Automatically open a port through compatible routers.</small></span>
+                <input type="checkbox" id="setting-nat"><i></i>
+              </label>
+              <label class="settings-toggle-row">
+                <span><b>Announce LAN addresses</b><small>Tell remote devices about this device’s local addresses.</small></span>
+                <input type="checkbox" id="setting-announce-lan"><i></i>
+              </label>
+            </div>
+          </section>
+
+          <section class="settings-panel" data-settings-section="bandwidth" aria-labelledby="settings-bandwidth-title" hidden>
+            <div class="settings-panel-heading">
+              <div><span class="settings-panel-kicker">Transfer controls</span><h2 id="settings-bandwidth-title">Bandwidth</h2><p>Cap transfer speed or leave a value at zero for unlimited throughput.</p></div>
+              <span class="settings-panel-badge">Performance</span>
+            </div>
+            <div class="settings-field-grid">
+              <label class="settings-field">
+                <span>Maximum upload</span>
+                <div class="settings-input-with-unit"><input type="number" id="setting-max-send" min="0" step="1"><em>KiB/s</em></div>
+                <small>Zero allows unlimited upload speed.</small>
+              </label>
+              <label class="settings-field">
+                <span>Maximum download</span>
+                <div class="settings-input-with-unit"><input type="number" id="setting-max-recv" min="0" step="1"><em>KiB/s</em></div>
+                <small>Zero allows unlimited download speed.</small>
+              </label>
+              <label class="settings-field">
+                <span>Concurrent folders</span>
+                <input type="number" id="setting-folder-concurrency" min="-1" step="1">
+                <small>Zero selects a CPU-based default; −1 is unlimited.</small>
+              </label>
+              <label class="settings-field">
+                <span>Maximum connections</span>
+                <input type="number" id="setting-connection-limit" min="0" step="1">
+                <small>Zero allows any number of connections.</small>
+              </label>
+            </div>
+            <div class="settings-toggle-list">
+              <label class="settings-toggle-row">
+                <span><b>Apply limits on the local network</b><small>Use the upload and download caps for LAN transfers too.</small></span>
+                <input type="checkbox" id="setting-limit-lan"><i></i>
+              </label>
+            </div>
+          </section>
+
+          <section class="settings-panel" data-settings-section="interface" aria-labelledby="settings-interface-title" hidden>
+            <div class="settings-panel-heading">
+              <div><span class="settings-panel-kicker">Local administration</span><h2 id="settings-interface-title">Interface &amp; security</h2><p>Manage where the local web interface listens and how administrators sign in.</p></div>
+              <span class="settings-panel-badge security">Sensitive</span>
+            </div>
+            <div class="settings-field-grid">
+              <label class="settings-field">
+                <span>GUI listen address</span>
+                <input type="text" id="setting-gui" placeholder="127.0.0.1:8384" readonly>
+                <small>Managed by the desktop app to keep the local API available.</small>
+              </label>
+              <label class="settings-field">
+                <span>Interface theme</span>
+                <select id="setting-theme">
+                  <option value="default">System default</option>
+                  <option value="dark">Dark</option>
+                  <option value="black">Black</option>
+                  <option value="light">Light</option>
+                </select>
+                <small>Applies to Syncthing’s built-in web interface.</small>
+              </label>
+              <label class="settings-field">
+                <span>Administrator username</span>
+                <input type="text" id="setting-gui-user" placeholder="Optional" autocomplete="username">
+                <small>Set both a username and password to enable authentication.</small>
+              </label>
+              <label class="settings-field">
+                <span>New administrator password</span>
+                <input type="password" id="setting-gui-password" placeholder="Leave blank to keep current password" autocomplete="new-password">
+                <small>Passwords are hashed by Syncthing before storage.</small>
+              </label>
+              <label class="settings-field wide settings-api-field">
+                <span>API key</span>
+                <div><input type="password" id="setting-api" readonly><button type="button" id="settings-toggle-api">Show</button><button type="button" id="settings-copy-api">Copy</button></div>
+                <small>Applications with this key can control Syncthing. Keep it private.</small>
+              </label>
+            </div>
+            <div class="settings-toggle-list">
+              <label class="settings-toggle-row">
+                <span><b>HTTPS for the local interface</b><small>Shown for reference. Transport is managed by the desktop application.</small></span>
+                <input type="checkbox" id="setting-gui-tls" disabled><i></i>
+              </label>
+            </div>
+            <div class="settings-security-note">
+              <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M9 12h6M12 9v6"></path></svg>
+              <span><b>Desktop-managed endpoint</b><small>The address and protocol are locked because changing them would disconnect this application from Syncthing.</small></span>
+            </div>
+          </section>
+
+          <section class="settings-panel" data-settings-section="privacy" aria-labelledby="settings-privacy-title" hidden>
+            <div class="settings-panel-heading">
+              <div><span class="settings-panel-kicker">Diagnostics</span><h2 id="settings-privacy-title">Privacy</h2><p>Choose which anonymous diagnostics this instance may send to the Syncthing project.</p></div>
+              <span class="settings-panel-badge">Optional</span>
+            </div>
+            <div class="settings-toggle-list">
+              <label class="settings-toggle-row">
+                <span><b>Anonymous usage reporting</b><small>Share aggregate version, platform, and feature statistics. File names and contents are never included.</small></span>
+                <input type="checkbox" id="setting-usage-reporting"><i></i>
+              </label>
+              <label class="settings-toggle-row">
+                <span><b>Crash reporting</b><small>Send diagnostic crash reports to help improve Syncthing stability.</small></span>
+                <input type="checkbox" id="setting-crash-reporting"><i></i>
+              </label>
+              <label class="settings-toggle-row">
+                <span><b>Audit logging</b><small>Record configuration and API activity to the audit log. Requires a restart.</small></span>
+                <input type="checkbox" id="setting-audit"><i></i>
+              </label>
+            </div>
+            <div class="settings-privacy-card">
+              <span>Local-first by design</span>
+              <p>Syncthing transfers files directly between your approved devices. It does not upload your data to a central storage service.</p>
+            </div>
+          </section>
+
+          <div class="settings-form-error" id="settings-form-error" role="alert"></div>
+        </form>
+      </div>
+
+      <div class="settings-restart-banner" id="settings-restart-banner" hidden>
+        <div><i></i><span><b>Restart required</b><small>Some saved changes will take effect after Syncthing restarts.</small></span></div>
+        <button type="button" id="settings-restart-dismiss">Dismiss</button>
       </div>
     </div>
 
     <!-- Advanced View -->
-    <div id="view-advanced" class="view-content placeholder-view" style="justify-content: flex-start; align-items: stretch; background: transparent; padding: 0;">
-      <div class="page-header">
-        <div class="title-section"><h1>Advanced</h1></div>
-      </div>
-      <div class="card form-card">
-        <p style="color: var(--text-grey); margin-bottom: 16px;">System Errors & Logs</p>
-        <div id="advanced-logs" class="logs-container">
-          Loading...
+    <div id="view-advanced" class="view-content">
+      <div class="page-header advanced-page-header">
+        <div class="advanced-heading-copy">
+          <span class="advanced-eyebrow">Diagnostics &amp; maintenance</span>
+          <h1>Advanced</h1>
+          <p>Inspect service health, review logs, tune diagnostics, and perform guarded maintenance.</p>
         </div>
+        <div class="advanced-header-actions">
+          <span class="advanced-live-state" id="advanced-live-state"><i></i><span>Service online</span></span>
+          <button type="button" class="advanced-refresh-button" id="advanced-refresh-btn">
+            <svg viewBox="0 0 24 24"><path d="M20 6v5h-5"></path><path d="M19 11a7 7 0 1 0 1 5"></path></svg>
+            Refresh diagnostics
+          </button>
+        </div>
+      </div>
+
+      <section class="advanced-summary-grid" aria-label="System diagnostic summary">
+        <article class="card advanced-summary-card featured">
+          <span>Service health</span>
+          <strong id="advanced-summary-health">Checking…</strong>
+          <small id="advanced-summary-uptime">Waiting for Syncthing</small>
+        </article>
+        <article class="card advanced-summary-card">
+          <span>Version</span>
+          <strong id="advanced-summary-version">—</strong>
+          <small id="advanced-summary-platform">Platform unavailable</small>
+        </article>
+        <article class="card advanced-summary-card">
+          <span>Memory allocated</span>
+          <strong id="advanced-summary-memory">0 B</strong>
+          <small id="advanced-summary-workers">0 active workers</small>
+        </article>
+        <article class="card advanced-summary-card">
+          <span>Recent issues</span>
+          <strong id="advanced-summary-errors">0</strong>
+          <small id="advanced-summary-error-copy">No errors reported</small>
+        </article>
+      </section>
+
+      <div class="advanced-workspace">
+        <aside class="card advanced-navigation-panel">
+          <div class="advanced-navigation-heading"><span>Developer tools</span><small>Choose a diagnostic view</small></div>
+          <nav class="advanced-navigation" aria-label="Advanced categories">
+            <button type="button" class="advanced-nav-item active" data-advanced-panel="overview" aria-selected="true">
+              <span class="advanced-nav-icon"><svg viewBox="0 0 24 24"><path d="M4 13h6V4H4zM14 20h6v-9h-6zM4 20h6v-3H4zM14 7h6V4h-6z"></path></svg></span>
+              <span><b>Overview</b><small>Health and system paths</small></span>
+            </button>
+            <button type="button" class="advanced-nav-item" data-advanced-panel="logs" aria-selected="false">
+              <span class="advanced-nav-icon"><svg viewBox="0 0 24 24"><path d="M4 5h16M4 12h16M4 19h10"></path></svg></span>
+              <span><b>System logs</b><small>Recent service activity</small></span>
+              <em id="advanced-log-count">0</em>
+            </button>
+            <button type="button" class="advanced-nav-item" data-advanced-panel="errors" aria-selected="false">
+              <span class="advanced-nav-icon"><svg viewBox="0 0 24 24"><path d="M12 3 2 21h20z"></path><path d="M12 9v5M12 18h.01"></path></svg></span>
+              <span><b>Errors</b><small>Actionable service issues</small></span>
+              <em class="warning" id="advanced-error-count">0</em>
+            </button>
+            <button type="button" class="advanced-nav-item" data-advanced-panel="debug" aria-selected="false">
+              <span class="advanced-nav-icon"><svg viewBox="0 0 24 24"><path d="M9 9h6v6H9zM3 12h6M15 12h6M12 3v6M12 15v6M5.5 5.5 9 9M15 15l3.5 3.5M18.5 5.5 15 9M9 15l-3.5 3.5"></path></svg></span>
+              <span><b>Debug levels</b><small>Facility-specific logging</small></span>
+            </button>
+            <button type="button" class="advanced-nav-item" data-advanced-panel="maintenance" aria-selected="false">
+              <span class="advanced-nav-icon"><svg viewBox="0 0 24 24"><path d="M14 6 4 16l4 4L18 10"></path><path d="m13 7 4-4 4 4-4 4"></path></svg></span>
+              <span><b>Maintenance</b><small>Updates and service actions</small></span>
+            </button>
+          </nav>
+          <div class="advanced-safety-note"><i></i><span><b>Guarded actions</b><small>Destructive database reset and forced shutdown are intentionally unavailable here.</small></span></div>
+        </aside>
+
+        <section class="card advanced-content-panel">
+          <div class="advanced-panel active" data-advanced-section="overview">
+            <div class="advanced-panel-heading">
+              <div><span class="advanced-panel-kicker">Runtime status</span><h2>System overview</h2><p>Live internal health and filesystem locations used by this instance.</p></div>
+              <span class="advanced-panel-badge healthy" id="advanced-overview-badge"><i></i>Healthy</span>
+            </div>
+            <div class="advanced-runtime-grid">
+              <div><span>Uptime</span><strong id="advanced-runtime-uptime">—</strong></div>
+              <div><span>Workers</span><strong id="advanced-runtime-workers">0</strong></div>
+              <div><span>Heap in use</span><strong id="advanced-runtime-heap">0 B</strong></div>
+              <div><span>Discovery methods</span><strong id="advanced-runtime-discovery">0</strong></div>
+            </div>
+            <div class="advanced-section-block">
+              <div class="advanced-section-title"><span>Connection services</span><small id="advanced-service-count">0 services</small></div>
+              <div class="advanced-service-list" id="advanced-service-list"><div class="advanced-empty-state">Loading connection services…</div></div>
+            </div>
+            <div class="advanced-section-block">
+              <div class="advanced-section-title"><span>Internal paths</span><small>Read-only</small></div>
+              <div class="advanced-path-list" id="advanced-path-list"><div class="advanced-empty-state">Loading system paths…</div></div>
+            </div>
+          </div>
+
+          <div class="advanced-panel" data-advanced-section="logs" hidden>
+            <div class="advanced-panel-heading">
+              <div><span class="advanced-panel-kicker">Live activity</span><h2>System logs</h2><p>Review recent messages emitted by the Syncthing service.</p></div>
+              <label class="advanced-auto-refresh"><input type="checkbox" id="advanced-auto-refresh"><i></i><span>Auto-refresh</span></label>
+            </div>
+            <div class="advanced-log-toolbar">
+              <label class="advanced-log-search"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><path d="m20 20-4-4"></path></svg><input type="search" id="advanced-log-search" placeholder="Search log messages" autocomplete="off"></label>
+              <select id="advanced-log-filter" aria-label="Filter log severity"><option value="all">All levels</option><option value="error">Errors</option><option value="warning">Warnings</option><option value="info">Info</option><option value="debug">Debug</option></select>
+              <button type="button" id="advanced-copy-logs">Copy visible</button>
+            </div>
+            <div class="advanced-log-list" id="advanced-logs"><div class="advanced-empty-state">Loading logs…</div></div>
+          </div>
+
+          <div class="advanced-panel" data-advanced-section="errors" hidden>
+            <div class="advanced-panel-heading">
+              <div><span class="advanced-panel-kicker">Service alerts</span><h2>Recent errors</h2><p>Errors remain here until cleared or the service’s in-memory history expires.</p></div>
+              <button type="button" class="advanced-clear-button" id="advanced-clear-errors" disabled>Clear all errors</button>
+            </div>
+            <div class="advanced-error-list" id="advanced-error-list"><div class="advanced-empty-state">Loading errors…</div></div>
+          </div>
+
+          <div class="advanced-panel" data-advanced-section="debug" hidden>
+            <div class="advanced-panel-heading">
+              <div><span class="advanced-panel-kicker">Diagnostic verbosity</span><h2>Debug levels</h2><p>Temporarily increase logging for a specific subsystem while troubleshooting.</p></div>
+              <button type="button" class="advanced-apply-button" id="advanced-apply-levels" disabled>Apply levels</button>
+            </div>
+            <div class="advanced-debug-warning"><i>!</i><span><b>Verbose logging can grow quickly.</b><small>Return facilities to Info after collecting the details you need.</small></span></div>
+            <label class="advanced-debug-search"><input type="search" id="advanced-debug-search" placeholder="Find a log facility" autocomplete="off"></label>
+            <div class="advanced-debug-list" id="advanced-debug-list"><div class="advanced-empty-state">Loading log facilities…</div></div>
+          </div>
+
+          <div class="advanced-panel" data-advanced-section="maintenance" hidden>
+            <div class="advanced-panel-heading">
+              <div><span class="advanced-panel-kicker">Service care</span><h2>Maintenance</h2><p>Export diagnostics, review updates, or restart the managed service.</p></div>
+              <span class="advanced-panel-badge" id="advanced-restart-state">No restart pending</span>
+            </div>
+            <div class="advanced-maintenance-list">
+              <article class="advanced-maintenance-row">
+                <span class="advanced-maintenance-icon"><svg viewBox="0 0 24 24"><path d="M12 3v12M7 10l5 5 5-5"></path><path d="M5 21h14"></path></svg></span>
+                <span><b>Support bundle</b><small>Download logs, runtime profiles, and a redacted configuration for troubleshooting.</small></span>
+                <button type="button" id="advanced-support-bundle">Download bundle</button>
+              </article>
+              <article class="advanced-maintenance-row">
+                <span class="advanced-maintenance-icon"><svg viewBox="0 0 24 24"><path d="M20 6v5h-5"></path><path d="M19 11a7 7 0 1 0 1 5"></path></svg></span>
+                <span><b>Software update</b><small id="advanced-update-copy">Checking the installed version…</small></span>
+                <button type="button" id="advanced-check-update">Check again</button>
+                <button type="button" class="primary" id="advanced-install-update" hidden>Install update</button>
+              </article>
+              <article class="advanced-maintenance-row caution">
+                <span class="advanced-maintenance-icon"><svg viewBox="0 0 24 24"><path d="M20 6v5h-5"></path><path d="M19 11a7 7 0 1 0 1 5"></path></svg></span>
+                <span><b>Restart Syncthing</b><small>Briefly interrupts synchronization while the managed service restarts.</small></span>
+                <button type="button" id="advanced-restart-service">Restart service</button>
+              </article>
+            </div>
+            <div class="advanced-action-feedback" id="advanced-action-feedback" role="status"></div>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -565,10 +939,17 @@
             <input type="text" id="add-folder-id" placeholder="creative-projects" pattern="[A-Za-z0-9._-]+" required autocomplete="off">
             <small>Used to identify this folder across devices.</small>
           </label>
-          <label class="folder-form-field">
-            <span>Local path</span>
-            <input type="text" id="add-folder-path" placeholder="/Users/you/Projects" required autocomplete="off">
-          </label>
+          <div class="folder-form-field">
+            <label for="add-folder-path">Folder on this device</label>
+            <div class="folder-path-picker">
+              <input type="text" id="add-folder-path" placeholder="Choose a folder or enter its path" required autocomplete="off">
+              <button type="button" id="add-folder-browse" class="folder-browse-button">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7.5h6l2 2H21v9.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><path d="M3 7.5V6a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v1.5"></path></svg>
+                <span>Choose folder</span>
+              </button>
+            </div>
+            <small id="add-folder-path-state" class="folder-path-state" aria-live="polite">Select a folder stored on this device.</small>
+          </div>
           <label class="folder-form-field">
             <span>Folder type</span>
             <select id="add-folder-type">

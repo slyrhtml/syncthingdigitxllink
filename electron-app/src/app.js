@@ -23,6 +23,16 @@ let activeDeviceFilter = 'all';
 let deviceSearchTerm = '';
 let deviceFoldersSnapshot = [];
 let pendingDevicesSnapshot = {};
+let settingsSnapshot = null;
+let settingsLoading = false;
+let settingsDirty = false;
+let advancedSnapshot = null;
+let advancedLoading = false;
+let advancedLogSearch = '';
+let advancedLogFilter = 'all';
+let advancedDebugSearch = '';
+let advancedLevelChanges = {};
+let advancedAutoRefreshTimer = null;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DASHBOARD_EVENT_CACHE_KEY = 'syncthing-dashboard-events-v1';
@@ -166,7 +176,6 @@ function initChart() {
 async function updateDashboardData() {
   const systemStatus = await fetchAPI('/system/status');
   const connections = await fetchAPI('/system/connections');
-  const discovery = await fetchAPI('/system/discovery');
   
   if (systemStatus) {
     localDeviceId = systemStatus.myID || localDeviceId;
@@ -176,18 +185,16 @@ async function updateDashboardData() {
     const mins = Math.floor((systemStatus.uptime % 3600) / 60);
     document.getElementById('dash-uptime').innerText = `${hours}h ${mins}m`;
     document.getElementById('dash-goroutines').innerText = systemStatus.goroutines || 0;
-  }
-  
-  if (discovery) {
-      let isOnline = false;
-      for (const key in discovery) {
-          if (discovery[key].error === null) {
-              isOnline = true;
-          }
-      }
-      const discoveryEl = document.getElementById('dash-discovery');
-      discoveryEl.innerText = isOnline ? 'Online' : 'Offline';
-      discoveryEl.style.color = isOnline ? '#adff2f' : '#f39c12';
+
+    const discoveryServices = Object.values(systemStatus.discoveryStatus || {});
+    const discoveryOnline = systemStatus.discoveryEnabled !== false && (
+      discoveryServices.length > 0
+        ? discoveryServices.some(service => !service?.error)
+        : Number(systemStatus.discoveryMethods || 0) > 0
+    );
+    const discoveryEl = document.getElementById('dash-discovery');
+    discoveryEl.innerText = discoveryOnline ? 'Online' : 'Offline';
+    discoveryEl.style.color = discoveryOnline ? '#adff2f' : '#f39c12';
   }
 
   if (connections?.total) {
@@ -330,7 +337,7 @@ function renderDashboardActivity() {
     event.data?.type === 'file' &&
     !event.data?.error
   );
-  const syncedFileEvents = completedFileEvents.filter(event => event.data?.action === 'update');
+  const syncedFileEvents = completedFileEvents.filter(event => event.data?.action !== 'delete');
   const removedFileEvents = completedFileEvents.filter(event => event.data?.action === 'delete');
   const failedFileEvents = dashboardEvents.filter(event =>
     event.type === 'ItemFinished' &&
@@ -448,18 +455,16 @@ async function updateFleetSummary() {
     const statuses = await Promise.all(
       config.folders.map(folder => fetchAPI(`/db/status?folder=${encodeURIComponent(folder.id)}`))
     );
-    config.folders.forEach((f, index) => {
+    config.folders.forEach((folder, index) => {
         const db = statuses[index];
-        if (db) {
-            locBytes += Number(db.localBytes || 0);
-            globBytes += Number(db.globalBytes || 0);
-            globalFiles += Number(db.globalFiles || 0);
-            pendingFiles += Number(db.needFiles || 0);
-            if (f.paused) foldErr++;
-            else if (db.state === 'idle') foldOk++;
-            else if (['syncing', 'scanning', 'scan-waiting', 'sync-waiting', 'cleaning'].includes(db.state)) foldSync++;
-            else foldErr++;
-        }
+        locBytes += Number(db?.localBytes || 0);
+        globBytes += Number(db?.globalBytes || 0);
+        globalFiles += Number(db?.globalFiles || 0);
+        pendingFiles += Number(db?.needFiles || 0);
+        const state = folderViewState(folder, db);
+        if (state.key === 'healthy') foldOk++;
+        else if (state.key === 'syncing') foldSync++;
+        else foldErr++;
     });
     
     document.getElementById('fleet-folders-ok').innerText = foldOk;
@@ -483,6 +488,9 @@ async function updateFleetSummary() {
     if (foldErr > 0) {
       syncHealth.classList.add('has-errors');
       syncHealthText.innerText = `${foldErr} ${foldErr === 1 ? 'folder needs' : 'folders need'} attention`;
+    } else if (config.folders.length === 0) {
+      syncHealth.classList.add('is-syncing');
+      syncHealthText.innerText = 'No folders configured';
     } else if (foldSync > 0 || pendingFiles > 0) {
       syncHealth.classList.add('is-syncing');
       syncHealthText.innerText = 'Sync in progress';
@@ -847,25 +855,613 @@ async function loadDevices() {
   renderDeviceDetail();
 }
 
-async function loadSettings() {
-  const config = await fetchAPI('/system/config');
-  if (!config) return;
-  
-  // Try mapping some standard fields if they exist
-  document.getElementById('setting-device-name').value = config.options?.urAccepted ? "Accepted" : "No Name (Demo)";
-  document.getElementById('setting-listen').value = config.options?.listenAddresses?.join(', ') || 'default';
-  document.getElementById('setting-gui').value = config.gui?.address || '127.0.0.1:8384';
-  document.getElementById('setting-api').value = config.gui?.apiKey || API_KEY;
+function setSettingsDirty(dirty, state = dirty ? 'dirty' : 'saved', message = dirty ? 'Unsaved changes' : 'All changes saved') {
+  settingsDirty = dirty;
+  const saveState = document.getElementById('settings-save-state');
+  if (!saveState) return;
+  saveState.className = `settings-save-state ${state}`;
+  saveState.querySelector('span').innerText = message;
+  document.getElementById('save-settings-btn').disabled = !dirty || state === 'saving';
+  document.getElementById('discard-settings-btn').disabled = !dirty || state === 'saving';
 }
 
-async function loadAdvancedLogs() {
-  const errors = await fetchAPI('/system/error');
-  const logsEl = document.getElementById('advanced-logs');
-  if (errors && errors.errors && errors.errors.length > 0) {
-    logsEl.innerText = errors.errors.map(e => `[${e.when}] ${e.message}`).join('\\n');
-  } else {
-    logsEl.innerText = 'No system errors found. All good!';
+function numberSetting(id, fallback = 0) {
+  const value = Number(document.getElementById(id).value);
+  return Number.isFinite(value) ? value : fallback;
+}
+
+function splitSettingList(value) {
+  const items = String(value || '')
+    .split(/[\n,]+/)
+    .map(item => item.trim())
+    .filter(Boolean);
+  return items.length ? [...new Set(items)] : ['default'];
+}
+
+function formatBandwidthSummary(sendKiB, receiveKiB) {
+  const send = Number(sendKiB || 0);
+  const receive = Number(receiveKiB || 0);
+  if (send === 0 && receive === 0) return 'Unlimited';
+  const formatLimit = value => value === 0 ? 'Unlimited' : `${formatBytes(value * 1024)}/s`;
+  return `↑ ${formatLimit(send)} · ↓ ${formatLimit(receive)}`;
+}
+
+function isLoopbackAddress(value) {
+  const address = String(value || '').trim().toLowerCase();
+  return address.startsWith('127.') || address.startsWith('localhost:') || address.startsWith('[::1]') || address.startsWith('unix');
+}
+
+function renderSettingsSummary(config, systemStatus, version, localDevice) {
+  const options = config.options || {};
+  const gui = config.gui || {};
+  const enabledServices = [
+    options.globalAnnounceEnabled,
+    options.localAnnounceEnabled,
+    options.relaysEnabled,
+    options.natEnabled
+  ].filter(Boolean).length;
+  const effectiveGuiAddress = systemStatus.guiAddressUsed || gui.address;
+
+  document.getElementById('settings-summary-device').innerText = localDevice?.name || 'Local Syncthing';
+  document.getElementById('settings-summary-id').innerText = localDeviceId ? localDeviceId.slice(0, 15) + '…' : 'Device ID unavailable';
+  document.getElementById('settings-summary-connectivity').innerText = `${enabledServices} / 4 enabled`;
+  document.getElementById('settings-summary-services').innerText = enabledServices === 4 ? 'Discovery, relays, and NAT ready' : 'Some network services are disabled';
+  document.getElementById('settings-summary-bandwidth').innerText = formatBandwidthSummary(options.maxSendKbps, options.maxRecvKbps);
+
+  const authenticated = Boolean(gui.user && gui.password);
+  const localOnly = isLoopbackAddress(effectiveGuiAddress);
+  document.getElementById('settings-summary-security').innerText = authenticated ? 'Protected' : localOnly ? 'Local only' : 'Needs attention';
+  document.getElementById('settings-summary-security-copy').innerText = authenticated
+    ? `${gui.useTLS ? 'HTTPS' : 'Password'} authentication enabled`
+    : localOnly ? 'Only accessible from this device' : 'Remote interface has no login';
+  document.getElementById('settings-service-state').innerText = 'Running';
+  const uptimeHours = Math.floor(Number(systemStatus.uptime || 0) / 3600);
+  document.getElementById('settings-service-meta').innerText = `${version?.version || 'Syncthing'} · ${uptimeHours}h uptime`;
+}
+
+async function loadSettings() {
+  if (settingsLoading) return;
+  settingsLoading = true;
+  const [config, systemStatus, version, restartState] = await Promise.all([
+    fetchAPI('/system/config'),
+    fetchAPI('/system/status'),
+    fetchAPI('/system/version'),
+    fetchAPI('/config/restart-required')
+  ]);
+
+  if (!config || !systemStatus) {
+    settingsLoading = false;
+    setSettingsDirty(true, 'error', 'Could not load settings');
+    document.getElementById('settings-form-error').innerText = 'The Syncthing service did not return its configuration.';
+    return;
   }
+
+  localDeviceId = systemStatus.myID || localDeviceId;
+  const options = config.options || {};
+  const gui = config.gui || {};
+  const devices = Array.isArray(config.devices) ? config.devices : [];
+  const localDevice = devices.find(device => device.deviceID === localDeviceId) || null;
+  settingsSnapshot = { config, systemStatus, version, localDevice };
+
+  document.getElementById('setting-device-name').value = localDevice?.name || '';
+  document.getElementById('setting-reconnect').value = options.reconnectionIntervalS ?? 20;
+  document.getElementById('setting-keep-temporaries').value = options.keepTemporariesH ?? 24;
+  document.getElementById('setting-low-priority').checked = options.setLowPriority !== false;
+  document.getElementById('setting-overwrite-names').checked = Boolean(options.overwriteRemoteDeviceNamesOnConnect);
+  document.getElementById('setting-listen').value = (options.listenAddresses || ['default']).join('\n');
+  document.getElementById('setting-global-discovery').checked = options.globalAnnounceEnabled !== false;
+  document.getElementById('setting-local-discovery').checked = options.localAnnounceEnabled !== false;
+  document.getElementById('setting-relays').checked = options.relaysEnabled !== false;
+  document.getElementById('setting-nat').checked = options.natEnabled !== false;
+  document.getElementById('setting-announce-lan').checked = options.announceLANAddresses !== false;
+  document.getElementById('setting-max-send').value = options.maxSendKbps ?? 0;
+  document.getElementById('setting-max-recv').value = options.maxRecvKbps ?? 0;
+  document.getElementById('setting-folder-concurrency').value = options.maxFolderConcurrency ?? 0;
+  document.getElementById('setting-connection-limit').value = options.connectionLimitMax ?? 0;
+  document.getElementById('setting-limit-lan').checked = Boolean(options.limitBandwidthInLan);
+  document.getElementById('setting-gui').value = systemStatus.guiAddressUsed || gui.address || '127.0.0.1:8384';
+  document.getElementById('setting-theme').value = gui.theme || 'default';
+  document.getElementById('setting-gui-user').value = gui.user || '';
+  document.getElementById('setting-gui-password').value = '';
+  document.getElementById('setting-api').value = gui.apiKey || API_KEY;
+  document.getElementById('setting-api').type = 'password';
+  document.getElementById('settings-toggle-api').innerText = 'Show';
+  document.getElementById('setting-gui-tls').checked = systemStatus.guiAddressOverridden ? false : Boolean(gui.useTLS);
+  document.getElementById('setting-usage-reporting').checked = Number(options.urAccepted || 0) > 0;
+  document.getElementById('setting-crash-reporting').checked = options.crashReportingEnabled !== false;
+  document.getElementById('setting-audit').checked = Boolean(options.auditEnabled);
+  document.getElementById('settings-form-error').innerText = '';
+  document.getElementById('settings-restart-banner').hidden = !restartState?.requiresRestart;
+
+  renderSettingsSummary(config, systemStatus, version, localDevice);
+  settingsLoading = false;
+  setSettingsDirty(false);
+}
+
+function collectSettingsChanges() {
+  if (!settingsSnapshot) return { error: 'Settings are not loaded yet.' };
+  const deviceName = document.getElementById('setting-device-name').value.trim();
+  const guiAddress = document.getElementById('setting-gui').value.trim();
+  const guiUser = document.getElementById('setting-gui-user').value.trim();
+  const guiPassword = document.getElementById('setting-gui-password').value;
+  if (!deviceName) return { error: 'Device name cannot be empty.' };
+  if (!guiAddress) return { error: 'GUI listen address cannot be empty.' };
+  if (numberSetting('setting-reconnect', 20) < 5) return { error: 'Reconnect interval must be at least five seconds.' };
+  if (guiPassword && !guiUser) return { error: 'Enter an administrator username before setting a password.' };
+  if (guiUser && !guiPassword && !settingsSnapshot.config.gui?.password) {
+    return { error: 'Set an administrator password to enable interface authentication.' };
+  }
+
+  const { config, systemStatus } = settingsSnapshot;
+  const currentOptions = config.options || {};
+  const reportVersion = Number(systemStatus.urVersionMax || currentOptions.urAccepted || 1);
+  const usageReporting = document.getElementById('setting-usage-reporting').checked;
+  const requestedOptions = {
+    reconnectionIntervalS: Math.round(numberSetting('setting-reconnect', 20)),
+    keepTemporariesH: Math.max(0, Math.round(numberSetting('setting-keep-temporaries', 24))),
+    setLowPriority: document.getElementById('setting-low-priority').checked,
+    overwriteRemoteDeviceNamesOnConnect: document.getElementById('setting-overwrite-names').checked,
+    listenAddresses: splitSettingList(document.getElementById('setting-listen').value),
+    globalAnnounceEnabled: document.getElementById('setting-global-discovery').checked,
+    localAnnounceEnabled: document.getElementById('setting-local-discovery').checked,
+    relaysEnabled: document.getElementById('setting-relays').checked,
+    natEnabled: document.getElementById('setting-nat').checked,
+    announceLANAddresses: document.getElementById('setting-announce-lan').checked,
+    maxSendKbps: Math.max(0, Math.round(numberSetting('setting-max-send', 0))),
+    maxRecvKbps: Math.max(0, Math.round(numberSetting('setting-max-recv', 0))),
+    maxFolderConcurrency: Math.max(-1, Math.round(numberSetting('setting-folder-concurrency', 0))),
+    connectionLimitMax: Math.max(0, Math.round(numberSetting('setting-connection-limit', 0))),
+    limitBandwidthInLan: document.getElementById('setting-limit-lan').checked,
+    urAccepted: usageReporting ? reportVersion : -1,
+    urSeen: reportVersion,
+    crashReportingEnabled: document.getElementById('setting-crash-reporting').checked,
+    auditEnabled: document.getElementById('setting-audit').checked
+  };
+  const options = Object.fromEntries(Object.entries(requestedOptions).filter(([key, value]) =>
+    JSON.stringify(currentOptions[key]) !== JSON.stringify(value)
+  ));
+  const currentGui = config.gui || {};
+  const gui = {};
+  const requestedTheme = document.getElementById('setting-theme').value;
+  if (requestedTheme !== currentGui.theme) gui.theme = requestedTheme;
+  if (guiUser !== (currentGui.user || '')) gui.user = guiUser;
+  if (guiPassword) gui.password = guiPassword;
+  return {
+    deviceName,
+    deviceNameChanged: deviceName !== (settingsSnapshot.localDevice?.name || ''),
+    options,
+    gui
+  };
+}
+
+async function waitForLocalAPI(attempts = 20, delayMs = 250) {
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      const response = await fetch(`${API_URL}/system/ping`, { headers });
+      if (response.ok) return true;
+    } catch (error) {
+      // GUI-related configuration changes briefly restart the local listener.
+    }
+    await new Promise(resolve => window.setTimeout(resolve, delayMs));
+  }
+  return false;
+}
+
+async function saveSettings() {
+  const changes = collectSettingsChanges();
+  const errorEl = document.getElementById('settings-form-error');
+  if (changes.error) {
+    errorEl.innerText = changes.error;
+    setSettingsDirty(true, 'error', 'Check highlighted settings');
+    return;
+  }
+
+  errorEl.innerText = '';
+  setSettingsDirty(true, 'saving', 'Saving configuration…');
+  const operations = [];
+  if (Object.keys(changes.options).length > 0) {
+    operations.push(() => requestJSON('/config/options', 'PATCH', changes.options));
+  }
+  if (changes.deviceNameChanged && localDeviceId) {
+    operations.push(() => requestJSON(`/config/devices/${encodeURIComponent(localDeviceId)}`, 'PATCH', { name: changes.deviceName }));
+  }
+  // Apply GUI changes last because Syncthing may briefly restart its API listener.
+  if (Object.keys(changes.gui).length > 0) {
+    operations.push(() => requestJSON('/config/gui', 'PATCH', changes.gui));
+  }
+
+  if (operations.length === 0) {
+    setSettingsDirty(false, 'saved', 'No changes to save');
+    return;
+  }
+
+  for (const operation of operations) {
+    const result = await operation();
+    if (!result.ok) {
+      errorEl.innerText = result.error || 'One or more settings could not be saved.';
+      setSettingsDirty(true, 'error', 'Save failed');
+      return;
+    }
+  }
+
+  if (!await waitForLocalAPI()) {
+    errorEl.innerText = 'Changes were saved, but the local Syncthing API did not come back online.';
+    setSettingsDirty(true, 'error', 'Save failed');
+    return;
+  }
+
+  await loadSettings();
+  setSettingsDirty(false, 'saved', 'Changes saved');
+}
+
+function formatDuration(seconds) {
+  const total = Math.max(0, Number(seconds || 0));
+  const days = Math.floor(total / 86400);
+  const hours = Math.floor((total % 86400) / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  if (days > 0) return `${days}d ${hours}h`;
+  if (hours > 0) return `${hours}h ${minutes}m`;
+  return `${minutes}m`;
+}
+
+function friendlyPathName(key) {
+  const names = {
+    config: 'Configuration file',
+    database: 'Index database',
+    certFile: 'Device certificate',
+    keyFile: 'Private key',
+    auditLog: 'Audit log',
+    defFolder: 'Default folder',
+    'baseDir-config': 'Configuration directory',
+    'baseDir-data': 'Data directory',
+    'baseDir-userHome': 'User home'
+  };
+  return names[key] || key.replace(/[-_]/g, ' ');
+}
+
+function classifyAdvancedLog(message, explicitLevel) {
+  const level = String(explicitLevel || '').toLowerCase();
+  const normalizedLevels = {
+    err: 'error',
+    error: 'error',
+    wrn: 'warning',
+    warn: 'warning',
+    warning: 'warning',
+    inf: 'info',
+    info: 'info',
+    dbg: 'debug',
+    debug: 'debug',
+    trace: 'debug'
+  };
+  if (normalizedLevels[level]) return normalizedLevels[level];
+  const text = String(message || '').toLowerCase();
+  if (/\b(error|fatal|failed|failure|panic)\b/.test(text)) return 'error';
+  if (/\b(warn|warning|timeout|retry)\b/.test(text)) return 'warning';
+  if (/\b(debug|trace)\b/.test(text)) return 'debug';
+  return 'info';
+}
+
+function renderAdvancedOverview() {
+  if (!advancedSnapshot) return;
+  const { status, paths, ping } = advancedSnapshot;
+  const services = Object.entries(status?.connectionServiceStatus || {});
+  const discovery = Object.keys(status?.discoveryStatus || {}).length || Number(status?.discoveryMethods || 0);
+  const serviceErrors = services.filter(([, service]) => Boolean(service?.error));
+
+  document.getElementById('advanced-runtime-uptime').innerText = formatDuration(status?.uptime);
+  document.getElementById('advanced-runtime-workers').innerText = formatCount(status?.goroutines || 0);
+  document.getElementById('advanced-runtime-heap').innerText = formatBytes(status?.alloc || 0);
+  document.getElementById('advanced-runtime-discovery').innerText = formatCount(discovery);
+  document.getElementById('advanced-service-count').innerText = `${formatCount(services.length)} ${services.length === 1 ? 'service' : 'services'}`;
+
+  const badge = document.getElementById('advanced-overview-badge');
+  if (ping?.ping !== 'pong') {
+    badge.className = 'advanced-panel-badge error';
+    badge.innerHTML = '<i></i>Unavailable';
+  } else if (serviceErrors.length > 0) {
+    badge.className = 'advanced-panel-badge warning';
+    badge.innerHTML = `<i></i>${serviceErrors.length} degraded`;
+  } else {
+    badge.className = 'advanced-panel-badge healthy';
+    badge.innerHTML = '<i></i>Healthy';
+  }
+
+  const serviceList = document.getElementById('advanced-service-list');
+  serviceList.replaceChildren();
+  if (services.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'advanced-empty-state';
+    empty.innerText = 'No connection services were reported.';
+    serviceList.appendChild(empty);
+  } else {
+    services.slice(0, 10).forEach(([name, service]) => {
+      const row = document.createElement('div');
+      row.className = `advanced-service-row${service?.error ? ' error' : ''}`;
+      const dot = document.createElement('i');
+      const copy = document.createElement('span');
+      const title = document.createElement('b');
+      title.innerText = name;
+      const details = document.createElement('small');
+      details.innerText = service?.error || [...(service?.lanAddresses || []), ...(service?.wanAddresses || [])][0] || 'Listening for connections';
+      copy.append(title, details);
+      const state = document.createElement('em');
+      state.innerText = service?.error ? 'Degraded' : 'Healthy';
+      row.append(dot, copy, state);
+      serviceList.appendChild(row);
+    });
+  }
+
+  const preferredPathKeys = ['config', 'database', 'baseDir-config', 'baseDir-data', 'certFile', 'keyFile', 'auditLog', 'defFolder'];
+  const pathEntries = preferredPathKeys.filter(key => paths?.[key]).map(key => [key, paths[key]]);
+  if (pathEntries.length === 0) {
+    Object.entries(paths || {}).slice(0, 8).forEach(entry => pathEntries.push(entry));
+  }
+  const pathList = document.getElementById('advanced-path-list');
+  pathList.replaceChildren();
+  if (pathEntries.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'advanced-empty-state';
+    empty.innerText = 'System paths are unavailable.';
+    pathList.appendChild(empty);
+  } else {
+    pathEntries.forEach(([key, path]) => {
+      const row = document.createElement('div');
+      row.className = 'advanced-path-row';
+      const label = document.createElement('span');
+      label.innerText = friendlyPathName(key);
+      const code = document.createElement('code');
+      code.innerText = path;
+      const copy = document.createElement('button');
+      copy.type = 'button';
+      copy.innerText = 'Copy';
+      copy.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(path);
+          copy.innerText = 'Copied';
+        } catch (error) {
+          console.error('Could not copy system path:', error);
+          copy.innerText = 'Failed';
+        }
+        window.setTimeout(() => { copy.innerText = 'Copy'; }, 1400);
+      });
+      row.append(label, code, copy);
+      pathList.appendChild(row);
+    });
+  }
+}
+
+function visibleAdvancedLogs() {
+  const logs = Array.isArray(advancedSnapshot?.logs?.messages) ? advancedSnapshot.logs.messages : [];
+  const search = advancedLogSearch.trim().toLowerCase();
+  return logs
+    .map(entry => ({ ...entry, severity: classifyAdvancedLog(entry.message, entry.level) }))
+    .filter(entry => advancedLogFilter === 'all' || entry.severity === advancedLogFilter)
+    .filter(entry => !search || String(entry.message || '').toLowerCase().includes(search))
+    .reverse();
+}
+
+function renderAdvancedLogs() {
+  if (!advancedSnapshot) return;
+  const logs = Array.isArray(advancedSnapshot.logs?.messages) ? advancedSnapshot.logs.messages : [];
+  const visible = visibleAdvancedLogs();
+  document.getElementById('advanced-log-count').innerText = formatCount(logs.length);
+  const list = document.getElementById('advanced-logs');
+  list.replaceChildren();
+  if (visible.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'advanced-empty-state';
+    empty.innerText = logs.length === 0 ? 'No system log messages are available.' : 'No log messages match this filter.';
+    list.appendChild(empty);
+    return;
+  }
+  visible.slice(0, 300).forEach(entry => {
+    const row = document.createElement('div');
+    row.className = `advanced-log-row ${entry.severity}`;
+    const time = document.createElement('time');
+    const date = validDeviceDate(entry.when);
+    time.innerText = date ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '—';
+    const level = document.createElement('span');
+    level.className = 'advanced-log-level';
+    level.innerText = entry.severity;
+    const message = document.createElement('p');
+    message.innerText = entry.message || 'Empty log message';
+    row.append(time, level, message);
+    list.appendChild(row);
+  });
+}
+
+function renderAdvancedErrors() {
+  if (!advancedSnapshot) return;
+  const errors = Array.isArray(advancedSnapshot.errors?.errors) ? advancedSnapshot.errors.errors : [];
+  const errorCount = document.getElementById('advanced-error-count');
+  errorCount.innerText = formatCount(errors.length);
+  errorCount.className = errors.length > 0 ? 'warning' : '';
+  document.getElementById('advanced-clear-errors').disabled = errors.length === 0;
+  const list = document.getElementById('advanced-error-list');
+  list.replaceChildren();
+  if (errors.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'advanced-empty-state';
+    empty.innerText = 'No recent service errors. Everything looks healthy.';
+    list.appendChild(empty);
+    return;
+  }
+  [...errors].reverse().forEach(error => {
+    const row = document.createElement('div');
+    row.className = 'advanced-error-row';
+    const icon = document.createElement('span');
+    icon.className = 'advanced-error-icon';
+    icon.innerText = '!';
+    const copy = document.createElement('span');
+    const message = document.createElement('b');
+    message.innerText = error.message || 'Unknown system error';
+    const relative = document.createElement('small');
+    const date = validDeviceDate(error.when);
+    relative.innerText = date ? formatRelativeTime(date) : 'Time unavailable';
+    copy.append(message, relative);
+    const time = document.createElement('time');
+    time.innerText = date ? date.toLocaleString() : '—';
+    row.append(icon, copy, time);
+    list.appendChild(row);
+  });
+}
+
+function renderAdvancedDebugLevels() {
+  const list = document.getElementById('advanced-debug-list');
+  if (!list) return;
+  const levels = advancedSnapshot?.logLevels?.levels || {};
+  const descriptions = advancedSnapshot?.logLevels?.packages || {};
+  const search = advancedDebugSearch.trim().toLowerCase();
+  const packages = Object.keys(levels).filter(name => `${name} ${descriptions[name] || ''}`.toLowerCase().includes(search));
+  list.replaceChildren();
+  if (packages.length === 0) {
+    const empty = document.createElement('div');
+    empty.className = 'advanced-empty-state';
+    empty.innerText = Object.keys(levels).length === 0
+      ? 'Facility-level controls are unavailable in this Syncthing build.'
+      : 'No logging facilities match this search.';
+    list.appendChild(empty);
+    return;
+  }
+
+  packages.sort().forEach(name => {
+    const row = document.createElement('label');
+    row.className = 'advanced-debug-row';
+    const copy = document.createElement('span');
+    const title = document.createElement('b');
+    title.innerText = name;
+    const description = document.createElement('small');
+    description.innerText = descriptions[name] || 'Syncthing subsystem';
+    copy.append(title, description);
+    const select = document.createElement('select');
+    select.dataset.logFacility = name;
+    ['DEBUG', 'INFO', 'WARN', 'ERROR'].forEach(level => {
+      const option = document.createElement('option');
+      option.value = level;
+      option.innerText = level[0] + level.slice(1).toLowerCase();
+      select.appendChild(option);
+    });
+    select.value = advancedLevelChanges[name] || String(levels[name] || 'INFO').toUpperCase();
+    select.addEventListener('change', () => {
+      if (select.value === String(levels[name] || 'INFO').toUpperCase()) delete advancedLevelChanges[name];
+      else advancedLevelChanges[name] = select.value;
+      document.getElementById('advanced-apply-levels').disabled = Object.keys(advancedLevelChanges).length === 0;
+    });
+    row.append(copy, select);
+    list.appendChild(row);
+  });
+}
+
+function renderAdvancedMaintenance() {
+  if (!advancedSnapshot) return;
+  const upgrade = advancedSnapshot.upgrade;
+  const updateCopy = document.getElementById('advanced-update-copy');
+  const install = document.getElementById('advanced-install-update');
+  if (upgrade === undefined) {
+    updateCopy.innerText = 'Run a check to look for a newer Syncthing release.';
+    install.hidden = true;
+  } else if (!upgrade) {
+    updateCopy.innerText = 'Automatic update checks are unavailable in this build.';
+    install.hidden = true;
+  } else if (upgrade.newer) {
+    updateCopy.innerText = `${upgrade.latest} is available; currently running ${upgrade.running}.`;
+    install.hidden = false;
+    install.innerText = `Install ${upgrade.latest}`;
+  } else {
+    updateCopy.innerText = `${upgrade.running || advancedSnapshot.version?.version || 'Current version'} is up to date.`;
+    install.hidden = true;
+  }
+  const restartState = document.getElementById('advanced-restart-state');
+  restartState.innerText = advancedSnapshot.restart?.requiresRestart ? 'Restart required' : 'No restart pending';
+  restartState.classList.toggle('warning', Boolean(advancedSnapshot.restart?.requiresRestart));
+}
+
+function renderAdvancedSummary() {
+  if (!advancedSnapshot) return;
+  const { ping, status, version, errors } = advancedSnapshot;
+  const healthy = ping?.ping === 'pong';
+  const errorCount = Array.isArray(errors?.errors) ? errors.errors.length : 0;
+  const live = document.getElementById('advanced-live-state');
+  live.className = `advanced-live-state${healthy ? '' : ' offline'}`;
+  live.querySelector('span').innerText = healthy ? 'Service online' : 'Service unavailable';
+  document.getElementById('advanced-summary-health').innerText = healthy ? 'Healthy' : 'Unavailable';
+  document.getElementById('advanced-summary-uptime').innerText = healthy ? `${formatDuration(status?.uptime)} uptime` : 'Could not reach the local API';
+  document.getElementById('advanced-summary-version').innerText = version?.version || '—';
+  document.getElementById('advanced-summary-platform').innerText = version ? `${version.os || 'unknown'} · ${version.arch || 'unknown'}` : 'Platform unavailable';
+  document.getElementById('advanced-summary-memory').innerText = formatBytes(status?.alloc || 0);
+  document.getElementById('advanced-summary-workers').innerText = `${formatCount(status?.goroutines || 0)} active workers`;
+  document.getElementById('advanced-summary-errors').innerText = formatCount(errorCount);
+  document.getElementById('advanced-summary-error-copy').innerText = errorCount === 0 ? 'No errors reported' : `${errorCount} ${errorCount === 1 ? 'issue needs' : 'issues need'} review`;
+}
+
+function renderAdvancedData() {
+  renderAdvancedSummary();
+  renderAdvancedOverview();
+  renderAdvancedLogs();
+  renderAdvancedErrors();
+  renderAdvancedDebugLevels();
+  renderAdvancedMaintenance();
+}
+
+async function loadAdvancedData() {
+  if (advancedLoading) return;
+  advancedLoading = true;
+  const refreshButton = document.getElementById('advanced-refresh-btn');
+  if (refreshButton) refreshButton.disabled = true;
+  const previousUpgrade = advancedSnapshot?.upgrade;
+  const [ping, status, version, paths, errors, logs, logLevels, restart] = await Promise.all([
+    fetchAPI('/system/ping'),
+    fetchAPI('/system/status'),
+    fetchAPI('/system/version'),
+    fetchAPI('/system/paths'),
+    fetchAPI('/system/error'),
+    fetchAPI('/system/log'),
+    fetchAPI('/system/loglevels'),
+    fetchAPI('/config/restart-required')
+  ]);
+  advancedSnapshot = { ping, status, version, paths, errors, logs, logLevels, upgrade: previousUpgrade, restart };
+  advancedLevelChanges = {};
+  document.getElementById('advanced-apply-levels').disabled = true;
+  renderAdvancedData();
+  advancedLoading = false;
+  if (refreshButton) refreshButton.disabled = false;
+}
+
+async function refreshAdvancedActivity() {
+  if (!advancedSnapshot || advancedLoading) return;
+  const [logs, errors] = await Promise.all([fetchAPI('/system/log'), fetchAPI('/system/error')]);
+  if (logs) advancedSnapshot.logs = logs;
+  if (errors) advancedSnapshot.errors = errors;
+  renderAdvancedSummary();
+  renderAdvancedLogs();
+  renderAdvancedErrors();
+}
+
+async function downloadSupportBundle() {
+  const button = document.getElementById('advanced-support-bundle');
+  const feedback = document.getElementById('advanced-action-feedback');
+  button.disabled = true;
+  button.innerText = 'Preparing…';
+  feedback.innerText = 'Collecting diagnostics. This can take a few seconds…';
+  try {
+    const response = await fetch(`${API_URL}/debug/support`, { headers });
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `syncthing-support-${new Date().toISOString().slice(0, 10)}.zip`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    feedback.innerText = 'Support bundle downloaded.';
+  } catch (error) {
+    console.error('Could not download support bundle:', error);
+    feedback.innerText = error.message || 'Could not create the support bundle.';
+  }
+  button.disabled = false;
+  button.innerText = 'Download bundle';
 }
 
 function folderPendingItems(dbStatus) {
@@ -890,16 +1486,19 @@ function folderProgress(dbStatus) {
 function folderViewState(folder, dbStatus) {
   if (folder.paused) return { key: 'attention', label: 'Paused' };
   if (!dbStatus) return { key: 'attention', label: 'Unavailable' };
-  if (dbStatus.invalid || dbStatus.state === 'error') return { key: 'attention', label: 'Error' };
+  if (dbStatus.invalid || dbStatus.error || dbStatus.watchError || Number(dbStatus.errors || 0) > 0 || dbStatus.state === 'error') {
+    return { key: 'attention', label: 'Error' };
+  }
 
   const pendingItems = folderPendingItems(dbStatus);
-  if (['syncing', 'scanning', 'scan-waiting', 'sync-waiting', 'cleaning'].includes(dbStatus.state)) {
+  if (['syncing', 'sync-preparing', 'scanning', 'starting', 'scan-waiting', 'sync-waiting', 'cleaning', 'clean-waiting'].includes(dbStatus.state)) {
     return {
       key: 'syncing',
       label: dbStatus.state === 'scanning' ? 'Scanning' : 'Syncing'
     };
   }
   if (pendingItems > 0) return { key: 'attention', label: 'Out of sync' };
+  if ((folder.devices || []).length <= 1) return { key: 'attention', label: 'Not shared' };
   if (dbStatus.state === 'idle') return { key: 'healthy', label: 'Up to date' };
   return { key: 'attention', label: dbStatus.state || 'Unknown' };
 }
@@ -1177,7 +1776,6 @@ document.addEventListener('DOMContentLoaded', () => {
   initChart();
   renderDashboardActivity();
   loadSettings();
-  loadAdvancedLogs();
   tick(); // Initial fetch
   setInterval(tick, 3000); // Poll every 3 seconds
 
@@ -1189,6 +1787,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const addFolderLabel = document.getElementById('add-folder-label');
   const addFolderId = document.getElementById('add-folder-id');
   const addFolderPath = document.getElementById('add-folder-path');
+  const addFolderBrowse = document.getElementById('add-folder-browse');
+  const addFolderPathState = document.getElementById('add-folder-path-state');
   const addFolderError = document.getElementById('add-folder-error');
   const addFolderSubmit = document.getElementById('add-folder-submit');
   const addDeviceModal = document.getElementById('add-device-modal');
@@ -1198,6 +1798,20 @@ document.addEventListener('DOMContentLoaded', () => {
   const addDeviceError = document.getElementById('add-device-error');
   const addDeviceSubmit = document.getElementById('add-device-submit');
   let folderIdEdited = false;
+
+  const updateGeneratedFolderId = () => {
+    if (folderIdEdited) return;
+    addFolderId.value = addFolderLabel.value
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9._-]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+  };
+
+  const resetFolderPathState = () => {
+    addFolderPathState.classList.remove('selected');
+    addFolderPathState.innerText = 'Select a folder stored on this device.';
+  };
 
   const closeAddFolderModal = () => {
     addFolderModal.hidden = true;
@@ -1225,6 +1839,7 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('add-folder-btn')?.addEventListener('click', () => {
     addFolderForm.reset();
     folderIdEdited = false;
+    resetFolderPathState();
     addFolderError.innerText = '';
     addFolderModal.hidden = false;
     window.setTimeout(() => addFolderLabel.focus(), 0);
@@ -1250,15 +1865,48 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   addFolderLabel?.addEventListener('input', () => {
-    if (folderIdEdited) return;
-    addFolderId.value = addFolderLabel.value
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9._-]+/g, '-')
-      .replace(/^-+|-+$/g, '');
+    updateGeneratedFolderId();
   });
   addFolderId?.addEventListener('input', () => {
     folderIdEdited = addFolderId.value.length > 0;
+  });
+
+  addFolderBrowse?.addEventListener('click', async () => {
+    if (!window.syncthingDesktop?.selectFolder) {
+      addFolderError.innerText = 'Folder selection is available in the desktop app. You can still enter a path manually.';
+      addFolderPath.focus();
+      return;
+    }
+
+    addFolderBrowse.disabled = true;
+    addFolderBrowse.querySelector('span').innerText = 'Choosing…';
+    addFolderError.innerText = '';
+    try {
+      const selection = await window.syncthingDesktop.selectFolder();
+      if (!selection?.canceled && selection?.path) {
+        addFolderPath.value = selection.path;
+        addFolderPathState.classList.add('selected');
+        addFolderPathState.innerText = 'Selected from this device';
+
+        if (!addFolderLabel.value.trim()) {
+          const pathParts = selection.path.split(/[\\/]/).filter(Boolean);
+          addFolderLabel.value = pathParts.at(-1) || 'Shared folder';
+          updateGeneratedFolderId();
+        }
+      }
+    } catch (error) {
+      addFolderError.innerText = `Could not open the folder picker: ${error.message || error}`;
+    } finally {
+      addFolderBrowse.disabled = false;
+      addFolderBrowse.querySelector('span').innerText = 'Choose folder';
+    }
+  });
+
+  addFolderPath?.addEventListener('input', () => {
+    addFolderPathState.classList.toggle('selected', Boolean(addFolderPath.value.trim()));
+    addFolderPathState.innerText = addFolderPath.value.trim()
+      ? 'Path ready to add'
+      : 'Select a folder stored on this device.';
   });
 
   addFolderForm?.addEventListener('submit', async event => {
@@ -1352,14 +2000,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const selectedFolderIds = [...document.querySelectorAll('input[name="device-folder"]:checked')]
       .map(input => input.value);
-    const sharingResults = await Promise.all(selectedFolderIds.map(folderId => {
+    const sharingResults = [];
+    for (const folderId of selectedFolderIds) {
       const folder = deviceFoldersSnapshot.find(item => item.id === folderId);
       const folderDevices = Array.isArray(folder?.devices) ? folder.devices : [];
-      if (!folder || folderDevices.some(reference => reference.deviceID === deviceID)) return Promise.resolve({ ok: true });
-      return requestJSON(`/config/folders/${encodeURIComponent(folderId)}`, 'PATCH', {
+      if (!folder || folderDevices.some(reference => reference.deviceID === deviceID)) {
+        sharingResults.push({ ok: true });
+        continue;
+      }
+      sharingResults.push(await requestJSON(`/config/folders/${encodeURIComponent(folderId)}`, 'PATCH', {
         devices: [...folderDevices, { deviceID }]
-      });
-    }));
+      }));
+    }
 
     selectedDeviceId = deviceID;
     closeAddDeviceModal();
@@ -1457,6 +2109,192 @@ document.addEventListener('DOMContentLoaded', () => {
     button.innerText = 'Remove';
   });
 
+  document.querySelectorAll('[data-settings-panel]').forEach(button => {
+    button.addEventListener('click', () => {
+      const panelName = button.dataset.settingsPanel;
+      document.querySelectorAll('[data-settings-panel]').forEach(navButton => {
+        const active = navButton === button;
+        navButton.classList.toggle('active', active);
+        navButton.setAttribute('aria-selected', String(active));
+      });
+      document.querySelectorAll('[data-settings-section]').forEach(panel => {
+        const active = panel.dataset.settingsSection === panelName;
+        panel.classList.toggle('active', active);
+        panel.hidden = !active;
+      });
+    });
+  });
+
+  document.getElementById('settings-form')?.addEventListener('input', () => {
+    if (!settingsLoading) {
+      document.getElementById('settings-form-error').innerText = '';
+      setSettingsDirty(true);
+    }
+  });
+  document.getElementById('settings-form')?.addEventListener('change', () => {
+    if (!settingsLoading) {
+      document.getElementById('settings-form-error').innerText = '';
+      setSettingsDirty(true);
+    }
+  });
+  document.getElementById('settings-form')?.addEventListener('submit', async event => {
+    event.preventDefault();
+    await saveSettings();
+  });
+  document.getElementById('discard-settings-btn')?.addEventListener('click', async () => {
+    await loadSettings();
+  });
+  document.getElementById('settings-toggle-api')?.addEventListener('click', event => {
+    const apiInput = document.getElementById('setting-api');
+    const show = apiInput.type === 'password';
+    apiInput.type = show ? 'text' : 'password';
+    event.currentTarget.innerText = show ? 'Hide' : 'Show';
+  });
+  document.getElementById('settings-copy-api')?.addEventListener('click', async event => {
+    const button = event.currentTarget;
+    const label = button.innerText;
+    try {
+      await navigator.clipboard.writeText(document.getElementById('setting-api').value);
+      button.innerText = 'Copied';
+    } catch (error) {
+      console.error('Could not copy API key:', error);
+      button.innerText = 'Copy failed';
+    }
+    window.setTimeout(() => { button.innerText = label; }, 1500);
+  });
+  document.getElementById('settings-restart-dismiss')?.addEventListener('click', () => {
+    document.getElementById('settings-restart-banner').hidden = true;
+  });
+
+  document.querySelectorAll('[data-advanced-panel]').forEach(button => {
+    button.addEventListener('click', () => {
+      const panelName = button.dataset.advancedPanel;
+      document.querySelectorAll('[data-advanced-panel]').forEach(navButton => {
+        const active = navButton === button;
+        navButton.classList.toggle('active', active);
+        navButton.setAttribute('aria-selected', String(active));
+      });
+      document.querySelectorAll('[data-advanced-section]').forEach(panel => {
+        const active = panel.dataset.advancedSection === panelName;
+        panel.classList.toggle('active', active);
+        panel.hidden = !active;
+      });
+    });
+  });
+  document.getElementById('advanced-refresh-btn')?.addEventListener('click', loadAdvancedData);
+  document.getElementById('advanced-log-search')?.addEventListener('input', event => {
+    advancedLogSearch = event.target.value;
+    renderAdvancedLogs();
+  });
+  document.getElementById('advanced-log-filter')?.addEventListener('change', event => {
+    advancedLogFilter = event.target.value;
+    renderAdvancedLogs();
+  });
+  document.getElementById('advanced-copy-logs')?.addEventListener('click', async event => {
+    const button = event.currentTarget;
+    const original = button.innerText;
+    const text = visibleAdvancedLogs()
+      .slice(0, 300)
+      .map(entry => `${entry.when || ''} [${entry.severity.toUpperCase()}] ${entry.message || ''}`)
+      .join('\n');
+    try {
+      await navigator.clipboard.writeText(text);
+      button.innerText = text ? 'Copied' : 'No logs';
+    } catch (error) {
+      console.error('Could not copy logs:', error);
+      button.innerText = 'Copy failed';
+    }
+    window.setTimeout(() => { button.innerText = original; }, 1500);
+  });
+  document.getElementById('advanced-auto-refresh')?.addEventListener('change', event => {
+    if (advancedAutoRefreshTimer) {
+      window.clearInterval(advancedAutoRefreshTimer);
+      advancedAutoRefreshTimer = null;
+    }
+    if (event.target.checked) {
+      advancedAutoRefreshTimer = window.setInterval(refreshAdvancedActivity, 5000);
+      refreshAdvancedActivity();
+    }
+  });
+  document.getElementById('advanced-clear-errors')?.addEventListener('click', async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.innerText = 'Clearing…';
+    const success = await postAPI('/system/error/clear');
+    if (success) await refreshAdvancedActivity();
+    button.innerText = success ? 'Errors cleared' : 'Clear failed';
+    window.setTimeout(() => {
+      button.innerText = 'Clear all errors';
+      button.disabled = !(advancedSnapshot?.errors?.errors || []).length;
+    }, 1400);
+  });
+  document.getElementById('advanced-debug-search')?.addEventListener('input', event => {
+    advancedDebugSearch = event.target.value;
+    renderAdvancedDebugLevels();
+  });
+  document.getElementById('advanced-apply-levels')?.addEventListener('click', async event => {
+    if (Object.keys(advancedLevelChanges).length === 0) return;
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.innerText = 'Applying…';
+    const result = await requestJSON('/system/loglevels', 'POST', advancedLevelChanges);
+    if (result.ok) {
+      const logLevels = await fetchAPI('/system/loglevels');
+      if (logLevels) advancedSnapshot.logLevels = logLevels;
+      advancedLevelChanges = {};
+      renderAdvancedDebugLevels();
+      button.innerText = 'Levels applied';
+    } else {
+      button.innerText = 'Apply failed';
+      button.disabled = false;
+    }
+    window.setTimeout(() => {
+      button.innerText = 'Apply levels';
+      button.disabled = Object.keys(advancedLevelChanges).length === 0;
+    }, 1500);
+  });
+  document.getElementById('advanced-support-bundle')?.addEventListener('click', downloadSupportBundle);
+  document.getElementById('advanced-check-update')?.addEventListener('click', async event => {
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.innerText = 'Checking…';
+    const upgrade = await fetchAPI('/system/upgrade');
+    if (advancedSnapshot) advancedSnapshot.upgrade = upgrade;
+    renderAdvancedMaintenance();
+    button.disabled = false;
+    button.innerText = 'Check again';
+  });
+  document.getElementById('advanced-install-update')?.addEventListener('click', async event => {
+    const latest = advancedSnapshot?.upgrade?.latest || 'the latest release';
+    if (!window.confirm(`Install ${latest} and restart Syncthing? Active transfers will pause briefly.`)) return;
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.innerText = 'Installing…';
+    const success = await postAPI('/system/upgrade');
+    document.getElementById('advanced-action-feedback').innerText = success
+      ? 'Update requested. Syncthing will restart when installation completes.'
+      : 'The update could not be started.';
+    if (!success) {
+      button.disabled = false;
+      button.innerText = `Install ${latest}`;
+    }
+  });
+  document.getElementById('advanced-restart-service')?.addEventListener('click', async event => {
+    if (!window.confirm('Restart Syncthing now? Synchronization will pause briefly while the managed service restarts.')) return;
+    const button = event.currentTarget;
+    button.disabled = true;
+    button.innerText = 'Restarting…';
+    const success = await postAPI('/system/restart');
+    document.getElementById('advanced-action-feedback').innerText = success
+      ? 'Restart requested. The service should be available again shortly.'
+      : 'The restart request failed.';
+    window.setTimeout(() => {
+      button.disabled = false;
+      button.innerText = 'Restart service';
+      loadAdvancedData();
+    }, 4500);
+  });
+
   document.getElementById('folder-rescan-btn')?.addEventListener('click', async event => {
     if (!selectedFolderId) return;
     const button = event.currentTarget;
@@ -1495,7 +2333,12 @@ document.addEventListener('DOMContentLoaded', () => {
       if (targetId === 'view-dashboard') tick();
       if (targetId === 'view-folders') loadFolders();
       if (targetId === 'view-devices') loadDevices();
-      if (targetId === 'view-advanced') loadAdvancedLogs();
+      if (targetId === 'view-advanced') loadAdvancedData();
+      else if (advancedAutoRefreshTimer) {
+        window.clearInterval(advancedAutoRefreshTimer);
+        advancedAutoRefreshTimer = null;
+        document.getElementById('advanced-auto-refresh').checked = false;
+      }
       if (targetId === 'view-settings') loadSettings();
     });
   });
