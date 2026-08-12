@@ -213,7 +213,7 @@ async function updateDashboardData() {
       downloadRate = Math.max(0, (inBytes - lastConnectionSample.inBytes) / elapsedSeconds);
     }
     lastConnectionSample = { at: now, outBytes, inBytes };
-    
+
     if (transferChart) {
       chartData.datasets[0].data.shift();
       chartData.datasets[0].data.push(uploadRate);
@@ -446,12 +446,12 @@ async function updateFleetSummary() {
     document.getElementById('fleet-devices-ok').innerText = devOk;
     document.getElementById('fleet-devices-off').innerText = devOff;
     document.getElementById('dash-device-availability').innerText = `${formatCount(devOk)} / ${formatCount(devOk + devOff)}`;
-    
+
     // Folders & Storage
     let foldOk = 0, foldSync = 0, foldErr = 0;
     let locBytes = 0, globBytes = 0;
     let globalFiles = 0, pendingFiles = 0;
-    
+
     const statuses = await Promise.all(
       config.folders.map(folder => fetchAPI(`/db/status?folder=${encodeURIComponent(folder.id)}`))
     );
@@ -466,11 +466,11 @@ async function updateFleetSummary() {
         else if (state.key === 'syncing') foldSync++;
         else foldErr++;
     });
-    
+
     document.getElementById('fleet-folders-ok').innerText = foldOk;
     document.getElementById('fleet-folders-sync').innerText = foldSync;
     document.getElementById('fleet-folders-err').innerText = foldErr;
-    
+
     document.getElementById('dash-storage-local').innerText = 'Local: ' + formatBytes(locBytes);
     document.getElementById('dash-storage-global').innerText = 'Global: ' + formatBytes(globBytes);
     document.getElementById('dash-pending-files').innerText = formatCount(pendingFiles);
@@ -2328,7 +2328,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (view.id === targetId) view.classList.add('active');
         else view.classList.remove('active');
       });
-      
+
       // Trigger instant load on tab switch
       if (targetId === 'view-dashboard') tick();
       if (targetId === 'view-folders') loadFolders();
